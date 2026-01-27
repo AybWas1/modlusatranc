@@ -33,13 +33,10 @@ function draw(){
       if(lastMove && lastMove.some(p=>p[0]==x&&p[1]==y))
         sq.classList.add("last");
 
-      const p=board[x][y];
-      if(p){
-        const sp=document.createElement("span");
-        sp.textContent=PIECES[p.t].s;
-        sp.className="piece"+(selected&&selected.x==x&&selected.y==y?" selected":"");
-        sp.style.color=p.c==="w"?"white":"black";
-        sq.appendChild(sp);
+      if(placing && !board[x][y]){
+        const d=document.createElement("div");
+        d.className="dot";
+        sq.appendChild(d);
       }
 
       if(moves.some(m=>m.x===x&&m.y===y)){
@@ -48,13 +45,24 @@ function draw(){
         sq.appendChild(d);
       }
 
+      const p=board[x][y];
+      if(p){
+        const sp=document.createElement("span");
+        sp.textContent=PIECES[p.t].s;
+        sp.className="piece";
+        if(selected && selected.x===x && selected.y===y)
+          sp.classList.add("selected");
+        sp.style.color=p.c==="w"?"white":"black";
+        sq.appendChild(sp);
+      }
+
       sq.onclick=()=>click(x,y);
       boardEl.appendChild(sq);
     }
   }
 
   turnEl.textContent="Sıra: "+(turn==="w"?"Beyaz":"Siyah");
-  scoreEl.textContent=`Puan: ${score.w} / ${score.b}`;
+  scoreEl.textContent=`Puan — Beyaz: ${score.w} | Siyah: ${score.b}`;
   drawPool();
 }
 
@@ -64,15 +72,27 @@ function drawPool(){
     if(k==="k")continue;
     const s=document.createElement("span");
     s.textContent=PIECES[k].s;
-    if(PIECES[k].c>score[turn]) s.classList.add("disabled");
-    s.onclick=()=>placing=k;
+
+    if(PIECES[k].c>score[turn])
+      s.classList.add("disabled");
+
+    if(placing===k)
+      s.classList.add("active");
+
+    s.onclick=()=>{
+      placing = placing===k ? null : k;
+      selected=null;
+      moves=[];
+      draw();
+    };
     poolEl.appendChild(s);
   }
 }
 
 function click(x,y){
   if(placing){
-    if(!board[x][y] && score[turn]>=PIECES[placing].c){
+    if(board[x][y]) return;
+    if(score[turn]>=PIECES[placing].c){
       board[x][y]={t:placing,c:turn};
       score[turn]-=PIECES[placing].c;
       placing=null;
@@ -99,6 +119,7 @@ function endTurn(){
   selected=null;
   moves=[];
   turn=turn==="w"?"b":"w";
+  draw();
 }
 
 function getMoves(x,y){
@@ -120,7 +141,7 @@ function getMoves(x,y){
 
   if(p.t==="p"){
     const dir=p.c==="w"?1:-1;
-    add(x,y+dir);
+    if(!board[x][y+dir]) add(x,y+dir);
   }
 
   return res;
