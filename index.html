@@ -1,29 +1,24 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Modlu Satranç</title>
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<h3>♟️ Modlu Satranç</h3>
+<h2>♟️ Modlanmış Satranç</h2>
 
 <div id="game">
   <div id="board"></div>
 
   <div id="side">
-    <button data-piece="P">♙ 1</button>
-    <button data-piece="N">♘ 3</button>
-    <button data-piece="B">♗ 3</button>
-    <button data-piece="R">♖ 5</button>
-    <button data-piece="Q">♕ 9</button>
+    <div class="panel" id="turn"></div>
+    <div class="panel" id="score"></div>
+    <div class="panel pool" id="pool"></div>
   </div>
 </div>
-
-<div id="info"></div>
 
 <script src="script.js"></script>
 </body>
