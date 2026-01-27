@@ -9,7 +9,6 @@
         :root { --light: #ebecd0; --dark: #779556; --select: #ffff33; --check: #ff4d4d; }
         body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 10px; }
         
-        /* Bağlantı Paneli */
         #network-panel { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; width: 400px; display: flex; flex-direction: column; gap: 10px; }
         input { padding: 8px; border-radius: 4px; border: none; }
         button { padding: 8px 15px; cursor: pointer; background: #779556; border: none; color: white; border-radius: 4px; font-weight: bold; }
@@ -32,14 +31,15 @@
         #pool span.disabled { opacity: 0.1; pointer-events: none; }
         #pool span.active { background: #779556 !important; }
 
-        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        #overlay h1 { font-size: 3em; margin-bottom: 20px; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
 
     <div id="overlay">
         <h1 id="win-text">ŞAH MAT!</h1>
-        <button onclick="location.reload()">Yeni Oyun</button>
+        <button onclick="location.reload()" style="font-size: 1.2em; padding: 15px 30px;">Tekrar Oyna</button>
     </div>
 
     <div id="network-panel">
@@ -57,6 +57,7 @@
             <div class="panel" id="turn-display">SIRA: BEYAZ</div>
             <div class="panel" id="score-display">B: 0 | S: 0</div>
             <div id="pool" class="panel"></div>
+            <div style="font-size: 0.7em; color: #888; text-align: center;">Hamle yapınca +1 puan kazanırsınız.</div>
         </div>
     </div>
 
@@ -64,33 +65,31 @@
         const PIECES = { p: { s: "♙", c: 1 }, n: { s: "♘", c: 3 }, b: { s: "♗", c: 3 }, r: { s: "♖", c: 5 }, q: { s: "♕", c: 9 }, k: { s: "♔", c: 0 } };
         
         let peer, conn;
-        let myRole = null; // 'w' veya 'b'
+        let myRole = null; 
         let board = [...Array(8)].map(() => Array(8).fill(null));
         let turn = "w";
-        let score = { w: 0, b: 0 };
+        let score = { w: 2, b: 2 }; // Başlangıç puanı
         let selected = null, moves = [], placing = null;
 
-        // --- NETWORK MANTIĞI ---
+        // --- NETWORK ---
         function initPeer() {
             peer = new Peer();
             peer.on('open', id => {
                 document.getElementById('my-id-display').innerHTML = `ID'niz: <b>${id}</b> <button onclick="navigator.clipboard.writeText('${id}')">Kopyala</button>`;
             });
-
             peer.on('connection', c => {
                 conn = c;
                 myRole = 'w';
                 setupConnection();
-                document.getElementById('status-text').textContent = "Durum: Bağlandı (Beyazsınız)";
             });
         }
 
         document.getElementById('connect-btn').onclick = () => {
             const peerId = document.getElementById('peer-id-input').value;
+            if(!peerId) return;
             conn = peer.connect(peerId);
             myRole = 'b';
             setupConnection();
-            document.getElementById('status-text').textContent = "Durum: Bağlanıyor...";
         };
 
         function setupConnection() {
@@ -100,23 +99,18 @@
                 draw();
             });
             conn.on('data', data => {
-                if (data.type === 'move') {
-                    executeMove(data.fx, data.fy, data.tx, data.ty, false);
-                } else if (data.type === 'place') {
-                    executePlace(data.x, data.y, data.piece, false);
-                }
+                if (data.type === 'move') executeMove(data.fx, data.fy, data.tx, data.ty, false);
+                else if (data.type === 'place') executePlace(data.x, data.y, data.piece, false);
             });
         }
 
-        function sendData(data) {
-            if (conn && conn.open) conn.send(data);
-        }
+        function sendData(data) { if (conn && conn.open) conn.send(data); }
 
         // --- OYUN MANTIĞI ---
         function initGame() {
             board = [...Array(8)].map(() => Array(8).fill(null));
-            board[0][0] = { t: "k", c: "w" };
-            board[7][7] = { t: "k", c: "b" };
+            board[4][0] = { t: "k", c: "w" };
+            board[4][7] = { t: "k", c: "b" };
         }
 
         function isCheck(color, tempBoard = board) {
@@ -153,16 +147,34 @@
             return res;
         }
 
+        function isGameOver(color) {
+            for (let x=0; x<8; x++) {
+                for (let y=0; y<8; y++) {
+                    if (board[x][y]?.c === color) {
+                        const mvs = getRawMoves(x, y, color, board).filter(m => {
+                            const tmp = board.map(r => [...r]); tmp[m.x][m.y] = tmp[x][y]; tmp[x][y] = null;
+                            return !isCheck(color, tmp);
+                        });
+                        if (mvs.length > 0) return false;
+                    }
+                }
+            }
+            // Taş koyma kontrolü
+            const canAfford = Object.values(PIECES).some(p => p.c > 0 && p.c <= score[color]);
+            const zoneAvailable = board.some((col, x) => col.some((sq, y) => !sq && ((color==='w' && y<2) || (color==='b' && y>5))));
+            if (canAfford && zoneAvailable) return false;
+            
+            return true;
+        }
+
         function click(x, y) {
             if (turn !== myRole) return;
-            const target = board[x][y];
             if (placing) {
                 const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
-                if (!target && isZone && score[turn] >= PIECES[placing].c) {
-                    executePlace(x, y, placing, true);
-                }
+                if (!board[x][y] && isZone && score[turn] >= PIECES[placing].c) executePlace(x, y, placing, true);
+                else { placing = null; draw(); }
             } else {
-                if (target && target.c === turn) {
+                if (board[x][y]?.c === turn) {
                     selected = {x, y};
                     moves = getRawMoves(x, y, turn, board).filter(m => {
                         const tmp = board.map(r => [...r]); tmp[m.x][m.y] = tmp[x][y]; tmp[x][y] = null;
@@ -171,15 +183,15 @@
                 } else if (selected && moves.some(m => m.x === x && m.y === y)) {
                     executeMove(selected.x, selected.y, x, y, true);
                 } else { selected = null; moves = []; }
+                draw();
             }
-            draw();
         }
 
         function executeMove(fx, fy, tx, ty, isLocal) {
             board[tx][ty] = board[fx][fy];
             board[fx][fy] = null;
             if (board[tx][ty].t === 'p' && (ty === 0 || ty === 7)) board[tx][ty].t = 'q';
-            score[turn] = Math.min(10, score[turn] + 1);
+            score[turn] = Math.min(15, score[turn] + 1);
             if (isLocal) sendData({ type: 'move', fx, fy, tx, ty });
             endTurn();
         }
@@ -194,9 +206,20 @@
 
         function endTurn() {
             selected = null; moves = [];
-            turn = (turn === "w") ? "b" : "w";
+            let nextTurn = (turn === "w") ? "b" : "w";
+            
+            if (isGameOver(nextTurn)) {
+                draw();
+                const msg = isCheck(nextTurn) ? (turn === "w" ? "BEYAZ KAZANDI!" : "SİYAH KAZANDI!") : "BERABERE (PAT)";
+                setTimeout(() => {
+                    document.getElementById("win-text").textContent = msg;
+                    document.getElementById("overlay").style.display = "flex";
+                }, 500);
+                return;
+            }
+            
+            turn = nextTurn;
             draw();
-            // Oyun bitti mi kontrolü buraya eklenebilir
         }
 
         function draw() {
