@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Modlu Satranç</title>
+<style>
+  body {
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+  }
+
+  canvas {
+    background: #000;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="640" height="680"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const CELL = 80;
+const BOARD_SIZE = 8;
+
+let board = Array.from({length: 8}, () => Array(8).fill("."));
+
+// başlangıç
+board[7][0] = "K"; // a1
+board[0][7] = "k"; // h8
+
+let whitePoints = 0;
+let selectedPiece = null;
+
+const PIECE_COSTS = { P:1, N:3, B:3, R:5, Q:9 };
+const PIECE_ICONS = {
+  P:"♙", N:"♘", B:"♗", R:"♖", Q:"♕", K:"♔"
+};
+
+// --- ÇİZİM ---
+function drawBoard() {
+  const colors = ["#f0d9b5", "#b58863"];
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      ctx.fillStyle = colors[(r+c)%2];
+      ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+
+      const piece = board[r][c];
+      if (piece !== ".") {
+        ctx.font = "48px DejaVu Sans";
+        ctx.fillStyle = piece === piece.toUpperCase() ? "#000" : "#444";
+        ctx.fillText(
+          PIECE_ICONS[piece.toUpperCase()],
+          c*CELL + 22,
+          r*CELL + 55
+        );
+      }
+    }
+  }
+}
+
+function drawUI() {
+  ctx.fillStyle = "#fff";
+  ctx.font = "20px Arial";
+  ctx.fillText("Puan: " + Math.floor(whitePoints), 10, 665);
+
+  const sel = selectedPiece
+    ? "Seçili taş: " + PIECE_ICONS[selectedPiece]
+    : "Seçili taş: yok (zorunlu değil)";
+  ctx.fillText(sel, 200, 665);
+}
+
+// --- GİRİŞLER ---
+document.addEventListener("keydown", e => {
+  const key = e.key.toUpperCase();
+
+  if (key === "ESCAPE") {
+    selectedPiece = null;
+  }
+
+  if (PIECE_COSTS[key]) {
+    selectedPiece = key;
+  }
+});
+
+canvas.addEventListener("click", e => {
+  if (!selectedPiece) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const col = Math.floor(x / CELL);
+  const row = Math.floor(y / CELL);
+
+  const cost = PIECE_COSTS[selectedPiece];
+  if (
+    row < 8 && col < 8 &&
+    board[row][col] === "." &&
+    whitePoints >= cost
+  ) {
+    board[row][col] = selectedPiece;
+    whitePoints -= cost;
+    selectedPiece = null;
+  }
+});
+
+// --- OYUN DÖNGÜSÜ ---
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawBoard();
+  drawUI();
+
+  whitePoints += 0.02; // demo puan artışı
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
