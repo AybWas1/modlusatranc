@@ -1,28 +1,154 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Modlu Satranç V2.1</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modlu Satranç - Tek Dosya</title>
+    <style>
+        /* CSS BURADA */
+        :root { --light: #d1a46a; --dark: #8b5a2b; --select: #00ffff; --last: #ffe066; --green: #2aff2a; }
+        body { margin: 0; background: #111; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+        #container { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+        #board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(92vw, 400px); aspect-ratio: 1; border: 4px solid #333; }
+        .square { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .light { background: var(--light); }
+        .dark { background: var(--dark); }
+        .piece { font-size: clamp(24px, 7vw, 40px); z-index: 5; user-select: none; transition: 0.1s; }
+        .selected { outline: 3px solid var(--select); outline-offset: -3px; }
+        .dot { width: 12px; height: 12px; background: var(--green); border-radius: 50%; position: absolute; opacity: 0.7; z-index: 6; }
+        #side { min-width: 140px; display: flex; flex-direction: column; gap: 10px; }
+        .panel { background: #222; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; }
+        #pool span { font-size: 30px; margin: 5px; cursor: pointer; display: inline-block; }
+        #pool span.disabled { opacity: 0.2; pointer-events: none; }
+        #pool span.active { background: #444; border-radius: 5px; }
+    </style>
 </head>
 <body>
 
-<h1>♟️ Modlu Satranç</h1>
+    <h1>♟️ Modlu Satranç</h1>
 
-<div id="container">
-  <div id="board"></div>
-
-  <div id="side">
-    <div class="panel" id="turn"></div>
-    <div class="panel" id="score"></div>
-    <div class="panel" id="pool"></div>
-    <div class="panel" style="font-size: 0.85em; color: #aaa;">
-      💡 Her hamle <b>+1 Puan</b> kazandırır. Maksimum 10 puan birikebilir.
+    <div id="container">
+        <div id="board"></div>
+        <div id="side">
+            <div class="panel" id="turn">Sıra: Beyaz</div>
+            <div class="panel" id="score">Puan: 0 - 0</div>
+            <div id="pool" class="panel">Market</div>
+        </div>
     </div>
-  </div>
-</div>
 
-<script src="script.js"></script>
+    <script>
+        // JAVASCRIPT BURADA
+        window.onload = () => {
+            const boardEl = document.getElementById("board");
+            const poolEl = document.getElementById("pool");
+            const turnEl = document.getElementById("turn");
+            const scoreEl = document.getElementById("score");
+
+            const PIECES = {
+                p: { s: "♙", c: 1 }, n: { s: "♘", c: 3 }, b: { s: "♗", c: 3 },
+                r: { s: "♖", c: 5 }, q: { s: "♕", c: 9 }, k: { s: "♔", c: 0 }
+            };
+
+            let board = [...Array(8)].map(() => Array(8).fill(null));
+            board[0][0] = { t: "k", c: "w" }; // Beyaz Şah A1
+            board[7][7] = { t: "k", c: "b" }; // Siyah Şah H8
+
+            let turn = "w";
+            let score = { w: 0, b: 0 };
+            let selected = null;
+            let moves = [];
+            let placing = null;
+
+            function draw() {
+                boardEl.innerHTML = "";
+                for (let y = 7; y >= 0; y--) {
+                    for (let x = 0; x < 8; x++) {
+                        const sq = document.createElement("div");
+                        sq.className = `square ${(x + y) % 2 ? "dark" : "light"}`;
+                        
+                        const p = board[x][y];
+                        if (p) {
+                            const sp = document.createElement("div");
+                            sp.className = "piece" + (selected && selected.x === x && selected.y === y ? " selected" : "");
+                            sp.textContent = PIECES[p.t].s;
+                            sp.style.color = p.c === "w" ? "white" : "black";
+                            sq.appendChild(sp);
+                        }
+
+                        if (moves.some(m => m.x === x && m.y === y) || (placing && !p)) {
+                            const d = document.createElement("div");
+                            d.className = "dot";
+                            sq.appendChild(d);
+                        }
+
+                        sq.onclick = () => click(x, y);
+                        boardEl.appendChild(sq);
+                    }
+                }
+                turnEl.textContent = "Sıra: " + (turn === "w" ? "Beyaz" : "Siyah");
+                scoreEl.innerHTML = `Puan<br>Beyaz: ${score.w} | Siyah: ${score.b}`;
+                drawPool();
+            }
+
+            function drawPool() {
+                poolEl.innerHTML = "<b>Market</b><br>";
+                for (const k in PIECES) {
+                    if (k === "k") continue;
+                    const s = document.createElement("span");
+                    s.textContent = PIECES[k].s;
+                    if (PIECES[k].c > score[turn]) s.className = "disabled";
+                    if (placing === k) s.className = "active";
+                    s.onclick = (e) => {
+                        e.stopPropagation();
+                        placing = (placing === k) ? null : k;
+                        selected = null;
+                        moves = [];
+                        draw();
+                    };
+                    poolEl.appendChild(s);
+                }
+            }
+
+            function click(x, y) {
+                if (placing) {
+                    if (!board[x][y] && score[turn] >= PIECES[placing].c) {
+                        board[x][y] = { t: placing, c: turn };
+                        score[turn] -= PIECES[placing].c;
+                        placing = null;
+                        turn = turn === "w" ? "b" : "w";
+                    }
+                } else {
+                    const p = board[x][y];
+                    if (p && p.c === turn) {
+                        selected = { x, y };
+                        moves = getSimpleMoves(x, y);
+                    } else if (selected && moves.some(m => m.x === x && m.y === y)) {
+                        board[x][y] = board[selected.x][selected.y];
+                        board[selected.x][selected.y] = null;
+                        score[turn] = Math.min(10, score[turn] + 1);
+                        selected = null;
+                        moves = [];
+                        turn = turn === "w" ? "b" : "w";
+                    }
+                }
+                draw();
+            }
+
+            function getSimpleMoves(x, y) {
+                const res = [];
+                for(let dx=-1; dx<=1; dx++) {
+                    for(let dy=-1; dy<=1; dy++) {
+                        if(dx===0 && dy===0) continue;
+                        let nx=x+dx, ny=y+dy;
+                        if(nx>=0 && nx<8 && ny>=0 && ny<8) {
+                            if(!board[nx][ny] || board[nx][ny].c !== turn) res.push({x:nx, y:ny});
+                        }
+                    }
+                }
+                return res;
+            }
+            draw();
+        };
+    </script>
 </body>
 </html>
