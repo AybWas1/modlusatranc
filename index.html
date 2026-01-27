@@ -57,7 +57,6 @@
             <div class="panel" id="turn-display">SIRA: BEYAZ</div>
             <div class="panel" id="score-display">B: 0 | S: 0</div>
             <div id="pool" class="panel"></div>
-            <div style="font-size: 0.7em; color: #888; text-align: center;">Hamle yapınca +1 puan kazanırsınız.</div>
         </div>
     </div>
 
@@ -68,10 +67,9 @@
         let myRole = null; 
         let board = [...Array(8)].map(() => Array(8).fill(null));
         let turn = "w";
-        let score = { w: 2, b: 2 }; // Başlangıç puanı
+        let score = { w: 2, b: 2 }; 
         let selected = null, moves = [], placing = null;
 
-        // --- NETWORK ---
         function initPeer() {
             peer = new Peer();
             peer.on('open', id => {
@@ -106,11 +104,11 @@
 
         function sendData(data) { if (conn && conn.open) conn.send(data); }
 
-        // --- OYUN MANTIĞI ---
         function initGame() {
             board = [...Array(8)].map(() => Array(8).fill(null));
-            board[4][0] = { t: "k", c: "w" };
-            board[4][7] = { t: "k", c: "b" };
+            // Beyaz Şah a1 (0,0) - Siyah Şah h8 (7,7)
+            board[0][0] = { t: "k", c: "w" };
+            board[7][7] = { t: "k", c: "b" };
         }
 
         function isCheck(color, tempBoard = board) {
@@ -159,11 +157,9 @@
                     }
                 }
             }
-            // Taş koyma kontrolü
             const canAfford = Object.values(PIECES).some(p => p.c > 0 && p.c <= score[color]);
             const zoneAvailable = board.some((col, x) => col.some((sq, y) => !sq && ((color==='w' && y<2) || (color==='b' && y>5))));
             if (canAfford && zoneAvailable) return false;
-            
             return true;
         }
 
@@ -207,7 +203,6 @@
         function endTurn() {
             selected = null; moves = [];
             let nextTurn = (turn === "w") ? "b" : "w";
-            
             if (isGameOver(nextTurn)) {
                 draw();
                 const msg = isCheck(nextTurn) ? (turn === "w" ? "BEYAZ KAZANDI!" : "SİYAH KAZANDI!") : "BERABERE (PAT)";
@@ -217,7 +212,6 @@
                 }, 500);
                 return;
             }
-            
             turn = nextTurn;
             draw();
         }
