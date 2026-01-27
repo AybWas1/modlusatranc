@@ -1,117 +1,129 @@
-const COST={P:1,N:3,B:3,R:5,Q:9};
-
-const ICON={
-  wP:"♙",wN:"♘",wB:"♗",wR:"♖",wQ:"♕",wK:"♔",
-  bP:"♟",bN:"♞",bB:"♝",bR:"♜",bQ:"♛",bK:"♚"
+const PIECES={
+  p:{s:"♙",c:1},
+  n:{s:"♘",c:3},
+  b:{s:"♗",c:3},
+  r:{s:"♖",c:5},
+  q:{s:"♕",c:9},
+  k:{s:"♔",c:0}
 };
 
-let board=Array.from({length:8},()=>Array(8).fill(null));
-board[7][0]="wK";
-board[0][7]="bK";
+let board=[...Array(8)].map(()=>Array(8).fill(null));
+board[0][0]={t:"k",c:"w"};
+board[7][7]={t:"k",c:"b"};
 
 let turn="w";
-let points={w:0,b:0};
+let score={w:0,b:0};
 let selected=null;
-let addPiece=null;
+let moves=[];
+let lastMove=null;
+let placing=null;
 
-const boardDiv=document.getElementById("board");
-const info=document.getElementById("info");
+const boardEl=document.getElementById("board");
+const poolEl=document.getElementById("pool");
+const turnEl=document.getElementById("turn");
+const scoreEl=document.getElementById("score");
 
 function draw(){
-  boardDiv.innerHTML="";
-  for(let r=0;r<8;r++){
-    for(let c=0;c<8;c++){
-      const cell=document.createElement("div");
-      cell.className="cell "+((r+c)%2?"dark":"light");
+  boardEl.innerHTML="";
+  for(let y=7;y>=0;y--){
+    for(let x=0;x<8;x++){
+      const sq=document.createElement("div");
+      sq.className="square "+((x+y)%2?"dark":"light");
 
-      if(selected && selected.r===r && selected.c===c)
-        cell.classList.add("selected");
+      if(lastMove && lastMove.some(p=>p[0]==x&&p[1]==y))
+        sq.classList.add("last");
 
-      if(board[r][c]){
-        const span=document.createElement("span");
-        span.className="piece "+(board[r][c][0]==="w"?"white-piece":"black-piece");
-        span.textContent=ICON[board[r][c]];
-        cell.appendChild(span);
+      const p=board[x][y];
+      if(p){
+        const sp=document.createElement("span");
+        sp.textContent=PIECES[p.t].s;
+        sp.className="piece"+(selected&&selected.x==x&&selected.y==y?" selected":"");
+        sp.style.color=p.c==="w"?"white":"black";
+        sq.appendChild(sp);
       }
 
-      cell.onclick=()=>clickCell(r,c);
-      boardDiv.appendChild(cell);
+      if(moves.some(m=>m.x===x&&m.y===y)){
+        const d=document.createElement("div");
+        d.className="dot";
+        sq.appendChild(d);
+      }
+
+      sq.onclick=()=>click(x,y);
+      boardEl.appendChild(sq);
     }
   }
-  info.textContent=`Sıra: ${turn==="w"?"Beyaz":"Siyah"} | Puan: ${points[turn]}/10`;
+
+  turnEl.textContent="Sıra: "+(turn==="w"?"Beyaz":"Siyah");
+  scoreEl.textContent=`Puan: ${score.w} / ${score.b}`;
+  drawPool();
 }
 
-function clickCell(r,c){
-  const piece=board[r][c];
+function drawPool(){
+  poolEl.innerHTML="Taş Ekle<br>";
+  for(const k in PIECES){
+    if(k==="k")continue;
+    const s=document.createElement("span");
+    s.textContent=PIECES[k].s;
+    if(PIECES[k].c>score[turn]) s.classList.add("disabled");
+    s.onclick=()=>placing=k;
+    poolEl.appendChild(s);
+  }
+}
 
-  if(addPiece){
-    if(!piece && points[turn]>=COST[addPiece]){
-      board[r][c]=turn+addPiece;
-      points[turn]-=COST[addPiece];
-      addPiece=null;
-      turn=opp(turn);
+function click(x,y){
+  if(placing){
+    if(!board[x][y] && score[turn]>=PIECES[placing].c){
+      board[x][y]={t:placing,c:turn};
+      score[turn]-=PIECES[placing].c;
+      placing=null;
+      endTurn();
     }
-    draw(); return;
+    return;
   }
 
-  if(selected){
-    if(isLegal(selected.r,selected.c,r,c)){
-      board[r][c]=board[selected.r][selected.c];
-      board[selected.r][selected.c]=null;
-      selected=null;
-      points[turn]=Math.min(10,points[turn]+1);
-      if(isMate(opp(turn))) alert((turn==="w"?"Beyaz":"Siyah")+" kazandı!");
-      turn=opp(turn);
-    }else selected=null;
-    draw(); return;
+  const p=board[x][y];
+  if(p && p.c===turn){
+    selected={x,y};
+    moves=getMoves(x,y);
+  }else if(selected && moves.some(m=>m.x===x&&m.y===y)){
+    board[x][y]=board[selected.x][selected.y];
+    board[selected.x][selected.y]=null;
+    lastMove=[[selected.x,selected.y],[x,y]];
+    score[turn]=Math.min(10,score[turn]+1);
+    endTurn();
   }
-
-  if(piece && piece[0]===turn){
-    selected={r,c};
-    draw();
-  }
+  draw();
 }
 
-function opp(t){return t==="w"?"b":"w"}
+function endTurn(){
+  selected=null;
+  moves=[];
+  turn=turn==="w"?"b":"w";
+}
 
-function isLegal(sr,sc,tr,tc){
-  const p=board[sr][sc];
-  if(!p) return false;
-  if(board[tr][tc] && board[tr][tc][0]===p[0]) return false;
+function getMoves(x,y){
+  const res=[];
+  const p=board[x][y];
+  if(!p)return res;
 
-  const t=p[1],dr=tr-sr,dc=tc-sc;
-  if(t==="K") return Math.max(Math.abs(dr),Math.abs(dc))===1;
-  if(t==="R") return (dr===0||dc===0)&&clear(sr,sc,tr,tc);
-  if(t==="B") return Math.abs(dr)===Math.abs(dc)&&clear(sr,sc,tr,tc);
-  if(t==="Q") return ((dr===0||dc===0)||Math.abs(dr)===Math.abs(dc))&&clear(sr,sc,tr,tc);
-  if(t==="N") return Math.abs(dr)*Math.abs(dc)===2;
-  if(t==="P"){
-    const dir=p[0]==="w"?-1:1;
-    if(dc===0 && dr===dir && !board[tr][tc]) return true;
-    if(Math.abs(dc)===1 && dr===dir && board[tr][tc]) return true;
+  const add=(nx,ny)=>{
+    if(nx<0||ny<0||nx>7||ny>7)return;
+    if(!board[nx][ny]||board[nx][ny].c!==p.c)
+      res.push({x:nx,y:ny});
+  };
+
+  if(p.t==="k"){
+    for(let dx=-1;dx<=1;dx++)
+      for(let dy=-1;dy<=1;dy++)
+        if(dx||dy)add(x+dx,y+dy);
   }
-  return false;
-}
 
-function clear(sr,sc,tr,tc){
-  const dr=Math.sign(tr-sr),dc=Math.sign(tc-sc);
-  let r=sr+dr,c=sc+dc;
-  while(r!==tr||c!==tc){
-    if(board[r][c]) return false;
-    r+=dr;c+=dc;
+  if(p.t==="p"){
+    const dir=p.c==="w"?1:-1;
+    add(x,y+dir);
   }
-  return true;
-}
 
-function isMate(t){
-  for(let r=0;r<8;r++)
-    for(let c=0;c<8;c++)
-      if(board[r][c]===t+"K") return false;
-  return true;
+  return res;
 }
-
-document.querySelectorAll("button").forEach(b=>{
-  b.onclick=()=>{addPiece=b.dataset.piece;selected=null};
-});
 
 draw();
