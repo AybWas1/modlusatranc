@@ -1,25 +1,26 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Modlu Satranç</title>
 
 <style>
 body {
   margin: 0;
-  font-family: system-ui;
   background: #111;
   color: white;
+  font-family: system-ui;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
+h3 { margin: 10px 0; }
+
 #game {
   display: flex;
   gap: 10px;
-  margin-top: 10px;
 }
 
 #board {
@@ -28,7 +29,7 @@ body {
   width: 90vw;
   max-width: 360px;
   aspect-ratio: 1;
-  border: 2px solid #555;
+  border: 2px solid #666;
 }
 
 .cell {
@@ -39,10 +40,12 @@ body {
   user-select: none;
 }
 
-.cell.white { background: #eee; color: black; }
-.cell.black { background: #444; }
+.white { background: #eee; color: black; }
+.black { background: #444; }
 
-.cell.selected { outline: 3px solid gold; }
+.selected {
+  outline: 3px solid gold;
+}
 
 #side {
   display: flex;
@@ -51,7 +54,7 @@ body {
 }
 
 button {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   padding: 6px;
 }
 
@@ -69,11 +72,11 @@ button {
   <div id="board"></div>
 
   <div id="side">
-    <button data-piece="P">♙ (1)</button>
-    <button data-piece="N">♘ (3)</button>
-    <button data-piece="B">♗ (3)</button>
-    <button data-piece="R">♖ (5)</button>
-    <button data-piece="Q">♕ (9)</button>
+    <button data-piece="P">♙ 1</button>
+    <button data-piece="N">♘ 3</button>
+    <button data-piece="B">♗ 3</button>
+    <button data-piece="R">♖ 5</button>
+    <button data-piece="Q">♕ 9</button>
   </div>
 </div>
 
@@ -87,8 +90,8 @@ const ICON = {
 };
 
 let board = Array.from({length:8},()=>Array(8).fill(null));
-board[7][0] = "wK";
-board[0][7] = "bK";
+board[7][0] = "wK"; // a1
+board[0][7] = "bK"; // h8
 
 let turn = "w";
 let points = { w:0, b:0 };
@@ -98,99 +101,115 @@ let addPiece = null;
 const boardDiv = document.getElementById("board");
 const info = document.getElementById("info");
 
+/* ---------- DRAW ---------- */
 function draw() {
   boardDiv.innerHTML = "";
   for(let r=0;r<8;r++){
     for(let c=0;c<8;c++){
       const cell = document.createElement("div");
       cell.className = "cell " + ((r+c)%2 ? "black":"white");
-      if(selected && selected.r===r && selected.c===c) cell.classList.add("selected");
+      if(selected && selected.r===r && selected.c===c)
+        cell.classList.add("selected");
       if(board[r][c]) cell.textContent = ICON[board[r][c]];
       cell.onclick = ()=>clickCell(r,c);
       boardDiv.appendChild(cell);
     }
   }
-  info.textContent = `Sıra: ${turn==="w"?"Beyaz":"Siyah"} | Puan: ${points[turn]}/10`;
+  info.textContent =
+    `Sıra: ${turn==="w"?"Beyaz":"Siyah"} | Puan: ${points[turn]}/10`;
 }
 
+/* ---------- CLICK ---------- */
 function clickCell(r,c){
   const piece = board[r][c];
 
-  // Hareket
-  if(selected && !addPiece){
-    if(isLegal(selected.r,selected.c,r,c)){
-      board[r][c] = board[selected.r][selected.c];
-      board[selected.r][selected.c] = null;
-      selected = null;
-      points[turn] = Math.min(10, points[turn]+1);
-      if(checkMate(opponent(turn))){
-        alert((turn==="w"?"Beyaz":"Siyah")+" kazandı!");
-      }
-      turn = opponent(turn);
-    } else selected = null;
-  }
-
-  // Seç
-  else if(piece && piece[0]===turn){
-    selected = {r,c};
-  }
-
-  // Taş ekle
-  else if(addPiece && !piece){
-    if(points[turn] >= COST[addPiece]){
+  // 1️⃣ TAŞ EKLEME
+  if(addPiece){
+    if(!piece && points[turn] >= COST[addPiece]){
       board[r][c] = turn + addPiece;
       points[turn] -= COST[addPiece];
       addPiece = null;
       turn = opponent(turn);
     }
+    draw();
+    return;
   }
 
-  draw();
+  // 2️⃣ HAREKET
+  if(selected){
+    if(isLegal(selected.r,selected.c,r,c)){
+      board[r][c] = board[selected.r][selected.c];
+      board[selected.r][selected.c] = null;
+      selected = null;
+
+      points[turn] = Math.min(10, points[turn] + 1);
+
+      if(isCheckMate(opponent(turn))){
+        alert((turn==="w"?"Beyaz":"Siyah")+" şah mat etti!");
+      }
+
+      turn = opponent(turn);
+    } else {
+      selected = null;
+    }
+    draw();
+    return;
+  }
+
+  // 3️⃣ SEÇ
+  if(piece && piece[0] === turn){
+    selected = {r,c};
+    draw();
+  }
 }
 
-function opponent(t){ return t==="w"?"b":"w"; }
-
-// GERÇEK SATRANÇ HAREKETLERİ (temel)
+/* ---------- MOVES ---------- */
 function isLegal(sr,sc,tr,tc){
   const p = board[sr][sc];
   if(!p) return false;
-  const type = p[1];
+  if(board[tr][tc] && board[tr][tc][0] === p[0]) return false;
+
+  const t = p[1];
   const dr = tr-sr, dc = tc-sc;
 
-  if(type==="K") return Math.max(Math.abs(dr),Math.abs(dc))===1;
-  if(type==="R") return (dr===0||dc===0) && clear(sr,sc,tr,tc);
-  if(type==="B") return Math.abs(dr)===Math.abs(dc) && clear(sr,sc,tr,tc);
-  if(type==="Q") return ((dr===0||dc===0)||Math.abs(dr)===Math.abs(dc)) && clear(sr,sc,tr,tc);
-  if(type==="N") return (Math.abs(dr)*Math.abs(dc)===2);
-  if(type==="P"){
+  if(t==="K") return Math.max(Math.abs(dr),Math.abs(dc))===1;
+  if(t==="R") return (dr===0||dc===0) && clear(sr,sc,tr,tc);
+  if(t==="B") return Math.abs(dr)===Math.abs(dc) && clear(sr,sc,tr,tc);
+  if(t==="Q")
+    return ((dr===0||dc===0)||Math.abs(dr)===Math.abs(dc)) && clear(sr,sc,tr,tc);
+  if(t==="N") return Math.abs(dr)*Math.abs(dc)===2;
+  if(t==="P"){
     const dir = p[0]==="w"?-1:1;
-    return dr===dir && dc===0 && !board[tr][tc];
+    if(dc===0 && dr===dir && !board[tr][tc]) return true;
+    if(Math.abs(dc)===1 && dr===dir && board[tr][tc]) return true;
   }
   return false;
 }
 
 function clear(sr,sc,tr,tc){
-  const dr=Math.sign(tr-sr), dc=Math.sign(tc-sc);
-  let r=sr+dr, c=sc+dc;
-  while(r!==tr||c!==tc){
+  const dr = Math.sign(tr-sr), dc = Math.sign(tc-sc);
+  let r = sr+dr, c = sc+dc;
+  while(r!==tr || c!==tc){
     if(board[r][c]) return false;
     r+=dr; c+=dc;
   }
   return true;
 }
 
-// ŞAH MAT (basit)
-function checkMate(t){
+/* ---------- CHECKMATE ---------- */
+function isCheckMate(t){
   for(let r=0;r<8;r++)
     for(let c=0;c<8;c++)
-      if(board[r][c]===t+"K") return false;
+      if(board[r][c] === t+"K") return false;
   return true;
 }
 
-// Panel
-document.querySelectorAll("button").forEach(b=>{
-  b.onclick=()=>{
-    addPiece = b.dataset.piece;
+function opponent(t){ return t==="w"?"b":"w"; }
+
+/* ---------- PANEL ---------- */
+document.querySelectorAll("button").forEach(btn=>{
+  btn.onclick = ()=>{
+    addPiece = btn.dataset.piece;
     selected = null;
   };
 });
