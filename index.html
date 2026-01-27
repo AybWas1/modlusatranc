@@ -3,131 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modlu Satranç - Pro</title>
+    <title>Modlu Satranç - Tam Sürüm</title>
     <style>
         :root {
             --light: #ebecd0;
             --dark: #779556;
             --select: #ffff33;
             --last: rgba(255, 255, 0, 0.5);
-            --dot: rgba(0, 0, 0, 0.15);
         }
 
         body {
-            margin: 0;
-            background: #2c2c2c;
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
+            margin: 0; background: #1a1a1a; color: white;
+            font-family: sans-serif; display: flex; flex-direction: column;
+            align-items: center; padding: 20px;
         }
 
-        #container {
-            display: flex;
-            gap: 25px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
+        #container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
 
-        /* Karelerin uzamasını engelleyen ana tahta yapısı */
+        /* KARELERİN YAMULMASINI ENGELLEYEN KESİN ÇÖZÜM */
         #board {
             display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            width: min(90vw, 480px);
-            aspect-ratio: 1 / 1;
-            border: 2px solid #111;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            grid-template-columns: repeat(8, 50px); /* Kare boyutunu sabitledik */
+            grid-template-rows: repeat(8, 50px);
+            width: 400px; height: 400px;
+            border: 5px solid #333;
+            user-select: none;
         }
 
         .square {
-            position: relative;
-            /* İçeriğin kareyi genişletmesini engellemek için */
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
+            width: 50px; height: 50px;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; cursor: pointer;
+            box-sizing: border-box; /* Padding'in boyutu bozmasını engeller */
         }
 
         .light { background: var(--light); }
         .dark { background: var(--dark); }
 
-        /* Taşların Görünümü */
         .piece {
-            font-size: clamp(32px, 8vw, 50px);
-            z-index: 5;
-            user-select: none;
-            transition: transform 0.1s ease;
-            cursor: grab;
-            /* Daha güzel bir görünüm için gölge ve derinlik */
+            font-size: 40px; z-index: 5; line-height: 1;
             filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.4));
-            line-height: 1;
         }
 
-        .piece:active { transform: scale(1.2); }
+        .selected { background-color: var(--select) !important; }
 
-        .selected {
-            background-color: var(--select) !important;
-        }
-
-        /* Hamle Noktaları */
         .dot {
-            width: 25%;
-            height: 25%;
-            background: var(--dot);
-            border-radius: 50%;
-            position: absolute;
-            z-index: 2;
+            width: 12px; height: 12px; background: rgba(0,0,0,0.2);
+            border-radius: 50%; position: absolute; z-index: 2;
         }
 
-        #side {
-            min-width: 180px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+        #side { min-width: 180px; display: flex; flex-direction: column; gap: 10px; }
+        .panel { background: #252525; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; }
 
-        .panel {
-            background: #1e1e1e;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-            border-bottom: 4px solid #111;
-        }
-
-        /* Market Yazısı Kalktı, Sadece Butonlar */
-        #pool {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-
+        #pool { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         #pool span {
-            font-size: 30px;
-            background: #333;
-            border-radius: 8px;
-            padding: 5px;
-            cursor: pointer;
-            transition: 0.2s;
-            border-bottom: 3px solid #000;
+            font-size: 28px; background: #333; border-radius: 5px;
+            padding: 5px; cursor: pointer; border-bottom: 2px solid #000;
         }
+        #pool span.disabled { opacity: 0.1; pointer-events: none; }
+        #pool span.active { background: #779556 !important; }
 
-        #pool span:hover:not(.disabled) { background: #444; transform: translateY(-2px); }
-        #pool span.disabled { opacity: 0.1; cursor: not-allowed; filter: grayscale(1); }
-        #pool span.active { 
-            background: #779556 !important; 
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        /* Oyun Bitti Ekranı */
+        #overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            z-index: 100; flex-direction: column; align-items: center; justify-content: center;
         }
-
-        #score { font-weight: bold; font-size: 1.1em; color: #ffcc00; }
-        #turn { font-weight: bold; letter-spacing: 1px; }
+        #overlay button {
+            margin-top: 20px; padding: 10px 20px; cursor: pointer;
+            background: #779556; border: none; color: white; border-radius: 5px;
+        }
     </style>
 </head>
 <body>
 
-    <h2 style="margin-top:0">♟️ Modlu Satranç</h2>
+    <div id="overlay">
+        <h1 id="win-text">BEYAZ KAZANDI!</h1>
+        <button onclick="location.reload()">Tekrar Oyna</button>
+    </div>
+
+    <h2 style="margin: 0 0 15px 0">♟️ Modlu Satranç</h2>
 
     <div id="container">
         <div id="board"></div>
@@ -144,6 +98,8 @@
             const poolEl = document.getElementById("pool");
             const turnEl = document.getElementById("turn");
             const scoreEl = document.getElementById("score");
+            const overlay = document.getElementById("overlay");
+            const winText = document.getElementById("win-text");
 
             const PIECES = {
                 p: { s: "♙", c: 1 }, n: { s: "♘", c: 3 }, b: { s: "♗", c: 3 },
@@ -188,8 +144,7 @@
                     }
                 }
                 turnEl.textContent = `SIRA: ${turn === "w" ? "BEYAZ" : "SİYAH"}`;
-                turnEl.style.color = turn === "w" ? "#fff" : "#999";
-                scoreEl.innerHTML = `PUAN<br>B: ${score.w} — S: ${score.b}`;
+                scoreEl.innerHTML = `B: ${score.w} | S: ${score.b}`;
                 drawPool();
             }
 
@@ -199,44 +154,80 @@
                     if (k === "k") continue;
                     const s = document.createElement("span");
                     s.textContent = PIECES[k].s;
-                    s.title = `${PIECES[k].c} Puan`;
                     if (PIECES[k].c > score[turn]) s.className = "disabled";
                     if (placing === k) s.className = "active";
                     s.onclick = (e) => {
                         e.stopPropagation();
                         placing = (placing === k) ? null : k;
-                        selected = null;
-                        moves = [];
+                        selected = null; moves = [];
                         draw();
                     };
                     poolEl.appendChild(s);
                 }
             }
 
+            function getMoves(x, y) {
+                const res = [];
+                const p = board[x][y];
+                if (!p) return res;
+
+                const add = (nx, ny) => {
+                    if (nx < 0 || ny < 0 || nx > 7 || ny > 7) return "stop";
+                    const target = board[nx][ny];
+                    if (!target) { res.push({ x: nx, y: ny }); return "cont"; }
+                    if (target.c !== p.c) { res.push({ x: nx, y: ny }); return "stop"; }
+                    return "stop";
+                };
+
+                const dirs = {
+                    r: [[1,0], [-1,0], [0,1], [0,-1]],
+                    b: [[1,1], [1,-1], [-1,1], [-1,-1]],
+                    n: [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [1,-2], [-1,2], [-1,-2]],
+                    q: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]],
+                    k: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]],
+                    p: p.c === "w" ? [[0,1]] : [[0,-1]]
+                };
+
+                if (["r", "b", "q"].includes(p.t)) {
+                    dirs[p.t].forEach(d => {
+                        for (let i = 1; i < 8; i++) {
+                            if (add(x + d[0] * i, y + d[1] * i) === "stop") break;
+                        }
+                    });
+                } else if (p.t === "p") {
+                    const dir = p.c === "w" ? 1 : -1;
+                    if (y + dir >= 0 && y + dir < 8 && !board[x][y+dir]) res.push({x, y: y+dir});
+                    [[1, dir], [-1, dir]].forEach(d => {
+                        let nx = x + d[0], ny = y + d[1];
+                        if (nx>=0 && nx<8 && ny>=0 && ny<8 && board[nx][ny] && board[nx][ny].c !== p.c) res.push({x:nx, y:ny});
+                    });
+                } else {
+                    dirs[p.t].forEach(d => add(x + d[0], y + d[1]));
+                }
+                return res;
+            }
+
             function click(x, y) {
+                const target = board[x][y];
                 if (placing) {
-                    if (!board[x][y] && score[turn] >= PIECES[placing].c) {
+                    if (!target && score[turn] >= PIECES[placing].c) {
                         board[x][y] = { t: placing, c: turn };
                         score[turn] -= PIECES[placing].c;
-                        placing = null;
-                        turn = turn === "w" ? "b" : "w";
+                        placing = null; endTurn();
                     }
                 } else {
-                    const p = board[x][y];
-                    if (p && p.c === turn) {
-                        if (selected && selected.x === x && selected.y === y) {
-                            selected = null; moves = [];
-                        } else {
-                            selected = { x, y };
-                            moves = getSimpleMoves(x, y);
-                        }
+                    if (target && target.c === turn) {
+                        selected = { x, y };
+                        moves = getMoves(x, y);
                     } else if (selected && moves.some(m => m.x === x && m.y === y)) {
+                        if (target && target.t === "k") {
+                            winText.textContent = (turn === "w" ? "BEYAZ" : "SİYAH") + " KAZANDI!";
+                            overlay.style.display = "flex";
+                        }
                         board[x][y] = board[selected.x][selected.y];
                         board[selected.x][selected.y] = null;
                         score[turn] = Math.min(10, score[turn] + 1);
-                        selected = null;
-                        moves = [];
-                        turn = turn === "w" ? "b" : "w";
+                        endTurn();
                     } else {
                         selected = null; moves = [];
                     }
@@ -244,20 +235,11 @@
                 draw();
             }
 
-            function getSimpleMoves(x, y) {
-                const res = [];
-                // Şimdilik tüm taşlar için 1 kare çevre hareketi (Önceki kodundaki mantık)
-                for(let dx=-1; dx<=1; dx++) {
-                    for(let dy=-1; dy<=1; dy++) {
-                        if(dx===0 && dy===0) continue;
-                        let nx=x+dx, ny=y+dy;
-                        if(nx>=0 && nx<8 && ny>=0 && ny<8) {
-                            if(!board[nx][ny] || board[nx][ny].c !== turn) res.push({x:nx, y:ny});
-                        }
-                    }
-                }
-                return res;
+            function endTurn() {
+                selected = null; moves = [];
+                turn = turn === "w" ? "b" : "w";
             }
+
             draw();
         };
     </script>
