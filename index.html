@@ -1,129 +1,201 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Modlu Satranç</title>
-<style>
-  body {
-    background: #222;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    font-family: Arial, sans-serif;
-  }
 
-  canvas {
-    background: #000;
-  }
+<style>
+body {
+  margin: 0;
+  font-family: system-ui;
+  background: #111;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#game {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 90vw;
+  max-width: 360px;
+  aspect-ratio: 1;
+  border: 2px solid #555;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  user-select: none;
+}
+
+.cell.white { background: #eee; color: black; }
+.cell.black { background: #444; }
+
+.cell.selected { outline: 3px solid gold; }
+
+#side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+button {
+  font-size: 1.3rem;
+  padding: 6px;
+}
+
+#info {
+  margin-top: 10px;
+}
 </style>
 </head>
+
 <body>
 
-<canvas id="game" width="640" height="680"></canvas>
+<h3>♟️ Modlu Satranç</h3>
+
+<div id="game">
+  <div id="board"></div>
+
+  <div id="side">
+    <button data-piece="P">♙ (1)</button>
+    <button data-piece="N">♘ (3)</button>
+    <button data-piece="B">♗ (3)</button>
+    <button data-piece="R">♖ (5)</button>
+    <button data-piece="Q">♕ (9)</button>
+  </div>
+</div>
+
+<div id="info"></div>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-
-const CELL = 80;
-const BOARD_SIZE = 8;
-
-let board = Array.from({length: 8}, () => Array(8).fill("."));
-
-// başlangıç
-board[7][0] = "K"; // a1
-board[0][7] = "k"; // h8
-
-let whitePoints = 0;
-let selectedPiece = null;
-
-const PIECE_COSTS = { P:1, N:3, B:3, R:5, Q:9 };
-const PIECE_ICONS = {
-  P:"♙", N:"♘", B:"♗", R:"♖", Q:"♕", K:"♔"
+const COST = { P:1, N:3, B:3, R:5, Q:9 };
+const ICON = {
+  wP:"♙", wN:"♘", wB:"♗", wR:"♖", wQ:"♕", wK:"♔",
+  bP:"♟", bN:"♞", bB:"♝", bR:"♜", bQ:"♛", bK:"♚"
 };
 
-// --- ÇİZİM ---
-function drawBoard() {
-  const colors = ["#f0d9b5", "#b58863"];
+let board = Array.from({length:8},()=>Array(8).fill(null));
+board[7][0] = "wK";
+board[0][7] = "bK";
 
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      ctx.fillStyle = colors[(r+c)%2];
-      ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+let turn = "w";
+let points = { w:0, b:0 };
+let selected = null;
+let addPiece = null;
 
-      const piece = board[r][c];
-      if (piece !== ".") {
-        ctx.font = "48px DejaVu Sans";
-        ctx.fillStyle = piece === piece.toUpperCase() ? "#000" : "#444";
-        ctx.fillText(
-          PIECE_ICONS[piece.toUpperCase()],
-          c*CELL + 22,
-          r*CELL + 55
-        );
-      }
+const boardDiv = document.getElementById("board");
+const info = document.getElementById("info");
+
+function draw() {
+  boardDiv.innerHTML = "";
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      const cell = document.createElement("div");
+      cell.className = "cell " + ((r+c)%2 ? "black":"white");
+      if(selected && selected.r===r && selected.c===c) cell.classList.add("selected");
+      if(board[r][c]) cell.textContent = ICON[board[r][c]];
+      cell.onclick = ()=>clickCell(r,c);
+      boardDiv.appendChild(cell);
     }
   }
+  info.textContent = `Sıra: ${turn==="w"?"Beyaz":"Siyah"} | Puan: ${points[turn]}/10`;
 }
 
-function drawUI() {
-  ctx.fillStyle = "#fff";
-  ctx.font = "20px Arial";
-  ctx.fillText("Puan: " + Math.floor(whitePoints), 10, 665);
+function clickCell(r,c){
+  const piece = board[r][c];
 
-  const sel = selectedPiece
-    ? "Seçili taş: " + PIECE_ICONS[selectedPiece]
-    : "Seçili taş: yok (zorunlu değil)";
-  ctx.fillText(sel, 200, 665);
+  // Hareket
+  if(selected && !addPiece){
+    if(isLegal(selected.r,selected.c,r,c)){
+      board[r][c] = board[selected.r][selected.c];
+      board[selected.r][selected.c] = null;
+      selected = null;
+      points[turn] = Math.min(10, points[turn]+1);
+      if(checkMate(opponent(turn))){
+        alert((turn==="w"?"Beyaz":"Siyah")+" kazandı!");
+      }
+      turn = opponent(turn);
+    } else selected = null;
+  }
+
+  // Seç
+  else if(piece && piece[0]===turn){
+    selected = {r,c};
+  }
+
+  // Taş ekle
+  else if(addPiece && !piece){
+    if(points[turn] >= COST[addPiece]){
+      board[r][c] = turn + addPiece;
+      points[turn] -= COST[addPiece];
+      addPiece = null;
+      turn = opponent(turn);
+    }
+  }
+
+  draw();
 }
 
-// --- GİRİŞLER ---
-document.addEventListener("keydown", e => {
-  const key = e.key.toUpperCase();
+function opponent(t){ return t==="w"?"b":"w"; }
 
-  if (key === "ESCAPE") {
-    selectedPiece = null;
-  }
+// GERÇEK SATRANÇ HAREKETLERİ (temel)
+function isLegal(sr,sc,tr,tc){
+  const p = board[sr][sc];
+  if(!p) return false;
+  const type = p[1];
+  const dr = tr-sr, dc = tc-sc;
 
-  if (PIECE_COSTS[key]) {
-    selectedPiece = key;
+  if(type==="K") return Math.max(Math.abs(dr),Math.abs(dc))===1;
+  if(type==="R") return (dr===0||dc===0) && clear(sr,sc,tr,tc);
+  if(type==="B") return Math.abs(dr)===Math.abs(dc) && clear(sr,sc,tr,tc);
+  if(type==="Q") return ((dr===0||dc===0)||Math.abs(dr)===Math.abs(dc)) && clear(sr,sc,tr,tc);
+  if(type==="N") return (Math.abs(dr)*Math.abs(dc)===2);
+  if(type==="P"){
+    const dir = p[0]==="w"?-1:1;
+    return dr===dir && dc===0 && !board[tr][tc];
   }
+  return false;
+}
+
+function clear(sr,sc,tr,tc){
+  const dr=Math.sign(tr-sr), dc=Math.sign(tc-sc);
+  let r=sr+dr, c=sc+dc;
+  while(r!==tr||c!==tc){
+    if(board[r][c]) return false;
+    r+=dr; c+=dc;
+  }
+  return true;
+}
+
+// ŞAH MAT (basit)
+function checkMate(t){
+  for(let r=0;r<8;r++)
+    for(let c=0;c<8;c++)
+      if(board[r][c]===t+"K") return false;
+  return true;
+}
+
+// Panel
+document.querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{
+    addPiece = b.dataset.piece;
+    selected = null;
+  };
 });
 
-canvas.addEventListener("click", e => {
-  if (!selectedPiece) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  const col = Math.floor(x / CELL);
-  const row = Math.floor(y / CELL);
-
-  const cost = PIECE_COSTS[selectedPiece];
-  if (
-    row < 8 && col < 8 &&
-    board[row][col] === "." &&
-    whitePoints >= cost
-  ) {
-    board[row][col] = selectedPiece;
-    whitePoints -= cost;
-    selectedPiece = null;
-  }
-});
-
-// --- OYUN DÖNGÜSÜ ---
-function loop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  drawBoard();
-  drawUI();
-
-  whitePoints += 0.02; // demo puan artışı
-  requestAnimationFrame(loop);
-}
-
-loop();
+draw();
 </script>
 
 </body>
