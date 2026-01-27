@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modlu Satranç - Strateji</title>
+    <title>Modlu Satranç - Bot Edition v2.5</title>
     <style>
         :root { --light: #ebecd0; --dark: #779556; --select: #ffff33; --check: #ff4d4d; }
         body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 10px; }
@@ -24,10 +24,7 @@
         .piece { font-size: 40px; z-index: 5; line-height: 1; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.4)); }
         .selected { background-color: var(--select) !important; }
         .is-check { background-color: var(--check) !important; animation: pulse 1s infinite; }
-        
-        /* Taş sokulabilir alanları görselleştirme */
-        .drop-zone { box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3); }
-
+        .drop-zone { box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.4); }
         .dot { width: 12px; height: 12px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; z-index: 2; }
 
         #side { min-width: 180px; display: flex; flex-direction: column; gap: 10px; }
@@ -51,14 +48,14 @@
         <button onclick="location.reload()">Yeniden Başlat</button>
     </div>
 
-    <h2 style="margin: 5px">♟️ Gelişmiş Modlu Satranç</h2>
-    <p style="font-size: 0.8em; color: #aaa; margin-bottom: 10px;">Beyaz alt 2 sıraya, Siyah üst 2 sıraya taş ekleyebilir.</p>
+    <h2 style="margin: 5px">♟️ Modlu Satranç vs BOT</h2>
+    <p style="font-size: 0.8em; color: #aaa; margin-bottom: 10px;">Beyaz: Alt 2 sıra | Siyah (Bot): Üst 2 sıra</p>
 
     <div id="container">
         <div id="board"></div>
         <div id="side">
-            <div class="panel" id="turn">SIRA: BEYAZ</div>
-            <div class="panel" id="score">B: 0 | S: 0</div>
+            <div class="panel" id="turn">SIRA: SENDE</div>
+            <div class="panel" id="score">SEN: 0 | BOT: 0</div>
             <div id="pool" class="panel"></div>
             <div class="panel" id="status" style="font-size: 0.9em; color: #ffbc00;"></div>
         </div>
@@ -83,7 +80,7 @@
             board[0][0] = { t: "k", c: "w" }; 
             board[7][7] = { t: "k", c: "b" }; 
 
-            let turn = "w"; 
+            let turn = "w"; // w: Oyuncu, b: Bot
             let score = { w: 0, b: 0 };
             let selected = null;
             let moves = [];
@@ -97,7 +94,6 @@
                     }
                 }
                 if(!kingPos) return false;
-
                 const oppColor = color === 'w' ? 'b' : 'w';
                 for(let x=0; x<8; x++) {
                     for(let y=0; y<8; y++) {
@@ -120,14 +116,12 @@
                     if (target.c !== color) { res.push({ x: nx, y: ny }); return "stop"; }
                     return "stop";
                 };
-
                 const dirs = {
                     r: [[1,0], [-1,0], [0,1], [0,-1]], b: [[1,1], [1,-1], [-1,1], [-1,-1]],
                     n: [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [1,-2], [-1,2], [-1,-2]],
                     q: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]],
                     k: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]]
                 };
-
                 if (["r", "b", "q"].includes(p.t)) {
                     dirs[p.t].forEach(d => {
                         for (let i = 1; i < 8; i++) if (add(x + d[0] * i, y + d[1] * i) === "stop") break;
@@ -139,38 +133,29 @@
                         let nx = x + d[0], ny = y + d[1];
                         if (nx>=0 && nx<8 && ny>=0 && ny<8 && tempBoard[nx][ny] && tempBoard[nx][ny].c !== color) res.push({x:nx, y:ny});
                     });
-                } else {
-                    dirs[p.t].forEach(d => add(x + d[0], y + d[1]));
-                }
+                } else { dirs[p.t].forEach(d => add(x + d[0], y + d[1])); }
                 return res;
             }
 
-            function getValidMoves(x, y) {
-                const raw = getRawMoves(x, y, turn, board);
+            function getValidMoves(x, y, color = turn) {
+                const raw = getRawMoves(x, y, color, board);
                 return raw.filter(m => {
                     const temp = board.map(row => [...row]);
                     temp[m.x][m.y] = temp[x][y];
                     temp[x][y] = null;
-                    return !isCheck(turn, temp);
+                    return !isCheck(color, temp);
                 });
             }
 
             function draw() {
                 boardEl.innerHTML = "";
-                const inCheck = isCheck(turn);
-                if(inCheck) statusEl.textContent = "⚠️ ŞAH TEHDİDİ!"; else statusEl.textContent = "";
+                if(isCheck(turn)) statusEl.textContent = "⚠️ ŞAH TEHDİDİ!"; else statusEl.textContent = "";
 
                 for (let y = 7; y >= 0; y--) {
                     for (let x = 0; x < 8; x++) {
                         const sq = document.createElement("div");
                         sq.className = `square ${(x + y) % 2 ? "dark" : "light"}`;
-                        
-                        // Taş ekleme bölgesi kontrolü
-                        if (placing) {
-                            const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
-                            if (isZone) sq.classList.add("drop-zone");
-                        }
-
+                        if (placing && ((turn === 'w' && y < 2) || (turn === 'b' && y > 5))) sq.classList.add("drop-zone");
                         const p = board[x][y];
                         if (p) {
                             const sp = document.createElement("div");
@@ -182,16 +167,14 @@
                             sq.appendChild(sp);
                         }
                         if (moves.some(m => m.x === x && m.y === y)) {
-                            const d = document.createElement("div");
-                            d.className = "dot";
-                            sq.appendChild(d);
+                            const d = document.createElement("div"); d.className = "dot"; sq.appendChild(d);
                         }
-                        sq.onclick = () => click(x, y);
+                        sq.onclick = () => turn === 'w' && click(x, y);
                         boardEl.appendChild(sq);
                     }
                 }
-                turnEl.textContent = turn === "w" ? "SIRA: BEYAZ" : "SIRA: SİYAH";
-                scoreEl.innerHTML = `B: ${score.w} | S: ${score.b}`;
+                turnEl.textContent = turn === "w" ? "SIRA: SENDE" : "SIRA: BOT...";
+                scoreEl.innerHTML = `SEN: ${score.w} | BOT: ${score.b}`;
                 drawPool();
             }
 
@@ -204,10 +187,10 @@
                     if (PIECES[k].c > score[turn]) s.className = "disabled";
                     if (placing === k) s.className = "active";
                     s.onclick = (e) => {
+                        if(turn !== 'w') return;
                         e.stopPropagation();
                         placing = (placing === k) ? null : k;
-                        selected = null; moves = [];
-                        draw();
+                        selected = null; moves = []; draw();
                     };
                     poolEl.appendChild(s);
                 }
@@ -224,38 +207,80 @@
                             board[x][y] = { t: placing, c: turn };
                             score[turn] -= PIECES[placing].c;
                             placing = null; endTurn();
-                        } else {
-                            alert("Şah tehdit altındayken bunu yapamazsınız!");
                         }
                     }
                 } else {
                     if (target && target.c === turn) {
                         selected = { x, y }; moves = getValidMoves(x, y);
                     } else if (selected && moves.some(m => m.x === x && m.y === y)) {
-                        board[x][y] = board[selected.x][selected.y];
-                        board[selected.x][selected.y] = null;
-                        
-                        // Piyon Terfisi
-                        if (board[x][y].t === 'p' && (y === 0 || y === 7)) {
-                            board[x][y].t = 'q'; // Otomatik Vezir (Basitlik için)
-                        }
-
-                        score[turn] = Math.min(10, score[turn] + 1);
-                        endTurn();
+                        executeMove(selected.x, selected.y, x, y);
                     } else { selected = null; moves = []; }
                 }
                 draw();
             }
 
-            function checkGameOver() {
+            function executeMove(fx, fy, tx, ty) {
+                board[tx][ty] = board[fx][fy];
+                board[fx][fy] = null;
+                if (board[tx][ty].t === 'p' && (ty === 0 || ty === 7)) board[tx][ty].t = 'q';
+                score[turn] = Math.min(10, score[turn] + 1);
+                endTurn();
+            }
+
+            function botPlay() {
+                // 1. Bot tahtadaki taşlarla hamle yapabilir mi?
+                let legalMoves = [];
                 for(let x=0; x<8; x++) {
                     for(let y=0; y<8; y++) {
-                        if(board[x][y] && board[x][y].c === turn) {
-                            if(getValidMoves(x, y).length > 0) return false;
+                        if(board[x][y] && board[x][y].c === 'b') {
+                            const mvs = getValidMoves(x, y, 'b');
+                            mvs.forEach(m => legalMoves.push({fx:x, fy:y, tx:m.x, ty:m.y, score: board[m.x][m.y] ? PIECES[board[m.x][m.y].t].c + 1 : 0}));
                         }
                     }
                 }
-                // Puanla taş koyarak şahı kurtarabilir mi?
+
+                // Öncelik: Taş yeme hamleleri
+                legalMoves.sort((a, b) => b.score - a.score);
+
+                // 2. Bot dışarıdan taş ekleyebilir mi?
+                let canAdd = [];
+                const types = ['q', 'r', 'n', 'b', 'p'];
+                for(let t of types) {
+                    if(score.b >= PIECES[t].c) {
+                        for(let x=0; x<8; x++) {
+                            for(let y=6; y<8; y++) {
+                                if(!board[x][y]) {
+                                    const temp = board.map(row => [...row]);
+                                    temp[x][y] = { t: t, c: 'b' };
+                                    if(!isCheck('b', temp)) canAdd.push({x, y, t});
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Botun kararı: Eğer çok iyi bir yeme hamlesi yoksa ve puanı varsa taş ekle
+                if (canAdd.length > 0 && (legalMoves.length === 0 || legalMoves[0].score < 4)) {
+                    const bestAdd = canAdd[Math.floor(Math.random() * canAdd.length)];
+                    board[bestAdd.x][bestAdd.y] = { t: bestAdd.t, c: 'b' };
+                    score.b -= PIECES[bestAdd.t].c;
+                    endTurn();
+                } else if (legalMoves.length > 0) {
+                    const move = legalMoves[0];
+                    executeMove(move.fx, move.fy, move.tx, move.ty);
+                } else {
+                    // Hiçbir şey yapamazsa (Mat durumu kontrolü zaten yapılıyor)
+                    endTurn();
+                }
+            }
+
+            function checkGameOver() {
+                for(let x=0; x<8; x++) {
+                    for(let y=0; y<8; y++) {
+                        if(board[x][y] && board[x][y].c === turn && getValidMoves(x, y).length > 0) return false;
+                    }
+                }
+                // Taş ekleyerek kurtulabilir mi?
                 if (score[turn] > 0) {
                     for(let x=0; x<8; x++) {
                         for(let y=0; y<8; y++) {
@@ -274,11 +299,14 @@
             function endTurn() {
                 selected = null; moves = [];
                 turn = turn === "w" ? "b" : "w";
+                draw();
                 if(checkGameOver()) {
                     overlay.style.display = "flex";
-                    document.getElementById("sub-text").textContent = (turn === 'w' ? "SİYAH" : "BEYAZ") + " KAZANDI!";
+                    document.getElementById("win-text").textContent = isCheck(turn) ? "ŞAH MAT!" : "PAT!";
+                    document.getElementById("sub-text").textContent = (turn === 'w' ? "BOT" : "BEYAZ") + " KAZANDI!";
+                    return;
                 }
-                draw();
+                if(turn === 'b') setTimeout(botPlay, 1000);
             }
             draw();
         };
