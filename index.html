@@ -3,41 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modlu Satranç - Tek Dosya</title>
+    <title>Modlu Satranç - Pro</title>
     <style>
-        /* CSS BURADA */
-        :root { --light: #d1a46a; --dark: #8b5a2b; --select: #00ffff; --last: #ffe066; --green: #2aff2a; }
-        body { margin: 0; background: #111; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 10px; }
-        #container { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
-        #board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(92vw, 400px); aspect-ratio: 1; border: 4px solid #333; }
-        .square { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        :root {
+            --light: #ebecd0;
+            --dark: #779556;
+            --select: #ffff33;
+            --last: rgba(255, 255, 0, 0.5);
+            --dot: rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            margin: 0;
+            background: #2c2c2c;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #container {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Karelerin uzamasını engelleyen ana tahta yapısı */
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            width: min(90vw, 480px);
+            aspect-ratio: 1 / 1;
+            border: 2px solid #111;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .square {
+            position: relative;
+            /* İçeriğin kareyi genişletmesini engellemek için */
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
         .light { background: var(--light); }
         .dark { background: var(--dark); }
-        .piece { font-size: clamp(24px, 7vw, 40px); z-index: 5; user-select: none; transition: 0.1s; }
-        .selected { outline: 3px solid var(--select); outline-offset: -3px; }
-        .dot { width: 12px; height: 12px; background: var(--green); border-radius: 50%; position: absolute; opacity: 0.7; z-index: 6; }
-        #side { min-width: 140px; display: flex; flex-direction: column; gap: 10px; }
-        .panel { background: #222; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #444; }
-        #pool span { font-size: 30px; margin: 5px; cursor: pointer; display: inline-block; }
-        #pool span.disabled { opacity: 0.2; pointer-events: none; }
-        #pool span.active { background: #444; border-radius: 5px; }
+
+        /* Taşların Görünümü */
+        .piece {
+            font-size: clamp(32px, 8vw, 50px);
+            z-index: 5;
+            user-select: none;
+            transition: transform 0.1s ease;
+            cursor: grab;
+            /* Daha güzel bir görünüm için gölge ve derinlik */
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.4));
+            line-height: 1;
+        }
+
+        .piece:active { transform: scale(1.2); }
+
+        .selected {
+            background-color: var(--select) !important;
+        }
+
+        /* Hamle Noktaları */
+        .dot {
+            width: 25%;
+            height: 25%;
+            background: var(--dot);
+            border-radius: 50%;
+            position: absolute;
+            z-index: 2;
+        }
+
+        #side {
+            min-width: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border-bottom: 4px solid #111;
+        }
+
+        /* Market Yazısı Kalktı, Sadece Butonlar */
+        #pool {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        #pool span {
+            font-size: 30px;
+            background: #333;
+            border-radius: 8px;
+            padding: 5px;
+            cursor: pointer;
+            transition: 0.2s;
+            border-bottom: 3px solid #000;
+        }
+
+        #pool span:hover:not(.disabled) { background: #444; transform: translateY(-2px); }
+        #pool span.disabled { opacity: 0.1; cursor: not-allowed; filter: grayscale(1); }
+        #pool span.active { 
+            background: #779556 !important; 
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        #score { font-weight: bold; font-size: 1.1em; color: #ffcc00; }
+        #turn { font-weight: bold; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
-    <h1>♟️ Modlu Satranç</h1>
+    <h2 style="margin-top:0">♟️ Modlu Satranç</h2>
 
     <div id="container">
         <div id="board"></div>
         <div id="side">
-            <div class="panel" id="turn">Sıra: Beyaz</div>
-            <div class="panel" id="score">Puan: 0 - 0</div>
-            <div id="pool" class="panel">Market</div>
+            <div class="panel" id="turn">SIRA: BEYAZ</div>
+            <div class="panel" id="score">B: 0 | S: 0</div>
+            <div id="pool" class="panel"></div>
         </div>
     </div>
 
     <script>
-        // JAVASCRIPT BURADA
         window.onload = () => {
             const boardEl = document.getElementById("board");
             const poolEl = document.getElementById("pool");
@@ -50,8 +151,8 @@
             };
 
             let board = [...Array(8)].map(() => Array(8).fill(null));
-            board[0][0] = { t: "k", c: "w" }; // Beyaz Şah A1
-            board[7][7] = { t: "k", c: "b" }; // Siyah Şah H8
+            board[0][0] = { t: "k", c: "w" }; 
+            board[7][7] = { t: "k", c: "b" }; 
 
             let turn = "w";
             let score = { w: 0, b: 0 };
@@ -69,9 +170,10 @@
                         const p = board[x][y];
                         if (p) {
                             const sp = document.createElement("div");
-                            sp.className = "piece" + (selected && selected.x === x && selected.y === y ? " selected" : "");
+                            sp.className = "piece";
+                            if (selected && selected.x === x && selected.y === y) sq.classList.add("selected");
                             sp.textContent = PIECES[p.t].s;
-                            sp.style.color = p.c === "w" ? "white" : "black";
+                            sp.style.color = p.c === "w" ? "#fff" : "#000";
                             sq.appendChild(sp);
                         }
 
@@ -85,17 +187,19 @@
                         boardEl.appendChild(sq);
                     }
                 }
-                turnEl.textContent = "Sıra: " + (turn === "w" ? "Beyaz" : "Siyah");
-                scoreEl.innerHTML = `Puan<br>Beyaz: ${score.w} | Siyah: ${score.b}`;
+                turnEl.textContent = `SIRA: ${turn === "w" ? "BEYAZ" : "SİYAH"}`;
+                turnEl.style.color = turn === "w" ? "#fff" : "#999";
+                scoreEl.innerHTML = `PUAN<br>B: ${score.w} — S: ${score.b}`;
                 drawPool();
             }
 
             function drawPool() {
-                poolEl.innerHTML = "<b>Market</b><br>";
+                poolEl.innerHTML = "";
                 for (const k in PIECES) {
                     if (k === "k") continue;
                     const s = document.createElement("span");
                     s.textContent = PIECES[k].s;
+                    s.title = `${PIECES[k].c} Puan`;
                     if (PIECES[k].c > score[turn]) s.className = "disabled";
                     if (placing === k) s.className = "active";
                     s.onclick = (e) => {
@@ -120,8 +224,12 @@
                 } else {
                     const p = board[x][y];
                     if (p && p.c === turn) {
-                        selected = { x, y };
-                        moves = getSimpleMoves(x, y);
+                        if (selected && selected.x === x && selected.y === y) {
+                            selected = null; moves = [];
+                        } else {
+                            selected = { x, y };
+                            moves = getSimpleMoves(x, y);
+                        }
                     } else if (selected && moves.some(m => m.x === x && m.y === y)) {
                         board[x][y] = board[selected.x][selected.y];
                         board[selected.x][selected.y] = null;
@@ -129,6 +237,8 @@
                         selected = null;
                         moves = [];
                         turn = turn === "w" ? "b" : "w";
+                    } else {
+                        selected = null; moves = [];
                     }
                 }
                 draw();
@@ -136,6 +246,7 @@
 
             function getSimpleMoves(x, y) {
                 const res = [];
+                // Şimdilik tüm taşlar için 1 kare çevre hareketi (Önceki kodundaki mantık)
                 for(let dx=-1; dx<=1; dx++) {
                     for(let dy=-1; dy<=1; dy++) {
                         if(dx===0 && dy===0) continue;
