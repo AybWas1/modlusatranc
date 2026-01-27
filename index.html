@@ -106,7 +106,6 @@
 
         function initGame() {
             board = [...Array(8)].map(() => Array(8).fill(null));
-            // Beyaz Şah a1 (0,0) - Siyah Şah h8 (7,7)
             board[0][0] = { t: "k", c: "w" };
             board[7][7] = { t: "k", c: "b" };
         }
@@ -146,6 +145,7 @@
         }
 
         function isGameOver(color) {
+            // Şah tehdidi altındayken oyuncu tahtadaki taşlarla hamle yapabiliyor mu?
             for (let x=0; x<8; x++) {
                 for (let y=0; y<8; y++) {
                     if (board[x][y]?.c === color) {
@@ -157,14 +157,25 @@
                     }
                 }
             }
-            const canAfford = Object.values(PIECES).some(p => p.c > 0 && p.c <= score[color]);
-            const zoneAvailable = board.some((col, x) => col.some((sq, y) => !sq && ((color==='w' && y<2) || (color==='b' && y>5))));
-            if (canAfford && zoneAvailable) return false;
+            // Şah çekilmiyorken (Normal durum veya Pat) dışarıdan taş koyabilir mi?
+            if (!isCheck(color)) {
+                const canAfford = Object.values(PIECES).some(p => p.c > 0 && p.c <= score[color]);
+                const zoneAvailable = board.some((col, x) => col.some((sq, y) => !sq && ((color==='w' && y<2) || (color==='b' && y>5))));
+                if (canAfford && zoneAvailable) return false;
+            }
             return true;
         }
 
         function click(x, y) {
             if (turn !== myRole) return;
+            
+            // Eğer ŞAH çekiliyorsa taş koymayı (placing) engelle
+            if (placing && isCheck(turn)) {
+                placing = null;
+                draw();
+                return;
+            }
+
             if (placing) {
                 const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
                 if (!board[x][y] && isZone && score[turn] >= PIECES[placing].c) executePlace(x, y, placing, true);
@@ -249,13 +260,19 @@
         function drawPool() {
             const pEl = document.getElementById("pool");
             pEl.innerHTML = "";
+            const currentlyInCheck = isCheck(turn);
             for (const k in PIECES) {
                 if (k === 'k') continue;
                 const s = document.createElement("span");
                 s.textContent = PIECES[k].s;
-                if (PIECES[k].c > score[turn] || turn !== myRole) s.className = "disabled";
+                // Şah altındaysan veya paran yetmiyorsa butonları deaktive et
+                if (PIECES[k].c > score[turn] || turn !== myRole || currentlyInCheck) s.className = "disabled";
                 if (placing === k) s.className = "active";
-                s.onclick = (e) => { e.stopPropagation(); if(turn === myRole) placing = (placing === k ? null : k); draw(); };
+                s.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    if(turn === myRole && !currentlyInCheck) placing = (placing === k ? null : k); 
+                    draw(); 
+                };
                 pEl.appendChild(s);
             }
         }
