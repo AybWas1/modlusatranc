@@ -1,113 +1,181 @@
-const boardEl = document.getElementById("board");
-const poolEl = document.getElementById("pool");
-const infoEl = document.getElementById("info");
-
 const PIECES = {
-  p:{s:"♙",c:1},
-  r:{s:"♖",c:5},
-  n:{s:"♘",c:3},
-  b:{s:"♗",c:3},
-  q:{s:"♕",c:9},
-  k:{s:"♔",c:0}
+  p: { s: "♙", c: 1 },
+  n: { s: "♘", c: 3 },
+  b: { s: "♗", c: 3 },
+  r: { s: "♖", c: 5 },
+  q: { s: "♕", c: 9 },
+  k: { s: "♔", c: 0 }
 };
 
-let board = Array(8).fill().map(()=>Array(8).fill(null));
-let turn = "white";
+let board = [...Array(8)].map(() => Array(8).fill(null));
+// Başlangıç şahları
+board[0][0] = { t: "k", c: "w" };
+board[7][7] = { t: "k", c: "b" };
+
+let turn = "w";
+let score = { w: 2, b: 2 }; // Başlangıç puanı
 let selected = null;
 let moves = [];
-let placing = null;
-let score = {white:20, black:20};
 let lastMove = null;
+let placing = null;
 
-function draw(){
-  boardEl.innerHTML="";
-  infoEl.innerHTML = `Sıra: ${turn} | Puan: ${score[turn]}`;
+const boardEl = document.getElementById("board");
+const poolEl = document.getElementById("pool");
+const turnEl = document.getElementById("turn");
+const scoreEl = document.getElementById("score");
 
-  for(let y=0;y<8;y++){
-    for(let x=0;x<8;x++){
+function draw() {
+  boardEl.innerHTML = "";
+  for (let y = 7; y >= 0; y--) {
+    for (let x = 0; x < 8; x++) {
       const sq = document.createElement("div");
-      sq.className = "square "+((x+y)%2?"dark":"light");
+      sq.className = `square ${(x + y) % 2 ? "dark" : "light"}`;
+      
+      if (lastMove && lastMove.some(p => p[0] === x && p[1] === y)) sq.classList.add("last");
 
-      if(lastMove && lastMove.x===x && lastMove.y===y)
-        sq.classList.add("last");
-
-      if(moves.some(m=>m.x===x && m.y===y))
-        sq.classList.add("move");
-
-      sq.onclick=()=>clickSquare(x,y);
-
-      const p = board[y][x];
-      if(p){
-        const sp = document.createElement("span");
+      const p = board[x][y];
+      if (p) {
+        const sp = document.createElement("div");
+        sp.className = `piece ${selected && selected.x === x && selected.y === y ? "selected" : ""}`;
         sp.textContent = PIECES[p.t].s;
-        sp.className = `piece ${p.c}`;
-        if(selected && selected.x===x && selected.y===y)
-          sp.classList.add("selected");
+        sp.style.color = p.c === "w" ? "white" : "#000";
         sq.appendChild(sp);
       }
 
+      // Hareket noktaları veya yerleştirme noktaları
+      if (moves.some(m => m.x === x && m.y === y) || (placing && !p)) {
+        const d = document.createElement("div");
+        d.className = "dot";
+        sq.appendChild(d);
+      }
+
+      sq.onclick = () => click(x, y);
       boardEl.appendChild(sq);
     }
   }
+
+  turnEl.innerHTML = `Sıra: <b style="color:${turn==='w'?'#fff':'#aaa'}">${turn === "w" ? "BEYAZ" : "SİYAH"}</b>`;
+  scoreEl.textContent = `Puan | B: ${score.w} - S: ${score.b}`;
   drawPool();
 }
 
-function drawPool(){
-  poolEl.innerHTML="<b>Taş Ekle</b>";
-  for(const k in PIECES){
-    if(k==="k") continue;
-    const s=document.createElement("span");
-    s.innerHTML=`<div>${PIECES[k].s}</div><small>${PIECES[k].c} puan</small>`;
-    if(score[turn]<PIECES[k].c) s.classList.add("disabled");
-    if(placing===k) s.classList.add("active");
-    s.onclick=()=>{placing=placing===k?null:k;selected=null;moves=[];draw();}
+function drawPool() {
+  poolEl.innerHTML = "<b>Taş Satın Al</b><br>";
+  for (const k in PIECES) {
+    if (k === "k") continue;
+    const s = document.createElement("span");
+    s.textContent = PIECES[k].s;
+    s.title = `${PIECES[k].c} Puan`;
+
+    if (PIECES[k].c > score[turn]) s.classList.add("disabled");
+    if (placing === k) s.classList.add("active");
+
+    s.onclick = () => {
+      if (PIECES[k].c <= score[turn]) {
+        placing = placing === k ? null : k;
+        selected = null;
+        moves = [];
+        draw();
+      }
+    };
     poolEl.appendChild(s);
   }
 }
 
-function clickSquare(x,y){
-  if(placing){
-    if(!board[y][x]){
-      board[y][x]={t:placing,c:turn};
-      score[turn]-=PIECES[placing].c;
-      placing=null;
-      turn=turn==="white"?"black":"white";
-    }
-    draw(); return;
-  }
+function getMoves(x, y) {
+  const res = [];
+  const p = board[x][y];
+  if (!p) return res;
 
-  const p=board[y][x];
-  if(p && p.c===turn){
-    selected={x,y};
-    moves=getMoves(x,y);
-  }else if(selected){
-    if(moves.some(m=>m.x===x&&m.y===y)){
-      board[y][x]=board[selected.y][selected.x];
-      board[selected.y][selected.x]=null;
-      lastMove={x,y};
-      selected=null;
-      moves=[];
-      turn=turn==="white"?"black":"white";
-    }
-  }
-  draw();
-}
+  const add = (nx, ny) => {
+    if (nx < 0 || ny < 0 || nx > 7 || ny > 7) return "stop";
+    const target = board[nx][ny];
+    if (p.t === "k" && kingTooClose(nx, ny, p.c)) return "stop";
 
-function getMoves(x,y){
-  const res=[];
-  for(let dx=-1;dx<=1;dx++){
-    for(let dy=-1;dy<=1;dy++){
-      if(dx||dy){
-        const nx=x+dx, ny=y+dy;
-        if(nx>=0&&ny>=0&&nx<8&&ny<8){
-          const t=board[ny][nx];
-          if(!t || t.c!==turn)
-            res.push({x:nx,y:ny});
-        }
+    if (!target) {
+      res.push({ x: nx, y: ny });
+      return "continue";
+    } else {
+      if (target.c !== p.c) res.push({ x: nx, y: ny });
+      return "stop";
+    }
+  };
+
+  const dirs = {
+    n: [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]],
+    r: [[1, 0], [-1, 0], [0, 1], [0, -1]],
+    b: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
+    q: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]],
+    k: [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+  };
+
+  if (p.t === "p") {
+    const dir = p.c === "w" ? 1 : -1;
+    // İleri hareket
+    if (y + dir >= 0 && y + dir < 8 && !board[x][y + dir]) res.push({ x: x, y: y + dir });
+    // Çapraz alma
+    [[1, dir], [-1, dir]].forEach(([dx, dy]) => {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8 && board[nx][ny] && board[nx][ny].c !== p.c) 
+        res.push({ x: nx, y: ny });
+    });
+  } else if (["r", "b", "q"].includes(p.t)) {
+    dirs[p.t].forEach(([dx, dy]) => {
+      for (let i = 1; i < 8; i++) {
+        if (add(x + dx * i, y + dy * i) === "stop") break;
       }
-    }
+    });
+  } else {
+    dirs[p.t].forEach(([dx, dy]) => add(x + dx, y + dy));
   }
   return res;
 }
 
+function click(x, y) {
+  if (placing) {
+    if (!board[x][y] && score[turn] >= PIECES[placing].c) {
+      board[x][y] = { t: placing, c: turn };
+      score[turn] -= PIECES[placing].c;
+      placing = null;
+      endTurn();
+    }
+    return;
+  }
+
+  const p = board[x][y];
+  if (p && p.c === turn) {
+    selected = { x, y };
+    moves = getMoves(x, y);
+  } else if (selected && moves.some(m => m.x === x && m.y === y)) {
+    board[x][y] = board[selected.x][selected.y];
+    board[selected.x][selected.y] = null;
+    lastMove = [[selected.x, selected.y], [x, y]];
+    score[turn] = Math.min(10, score[turn] + 1);
+    endTurn();
+  } else {
+    selected = null;
+    moves = [];
+  }
+  draw();
+}
+
+function kingTooClose(nx, ny, color) {
+  for (let ix = 0; ix < 8; ix++)
+    for (let iy = 0; iy < 8; iy++) {
+      const p = board[ix][iy];
+      if (p && p.t === "k" && p.c !== color) {
+        if (Math.abs(ix - nx) <= 1 && Math.abs(iy - ny) <= 1) return true;
+      }
+    }
+  return false;
+}
+
+function endTurn() {
+  selected = null;
+  moves = [];
+  turn = turn === "w" ? "b" : "w";
+  draw();
+}
+
 draw();
+        
