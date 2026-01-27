@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modlu Satranç - Bot Edition</title>
+    <title>Modlu Satranç - Strateji</title>
     <style>
-        :root { --light: #ebecd0; --dark: #779556; --select: #ffff33; }
-        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        :root { --light: #ebecd0; --dark: #779556; --select: #ffff33; --check: #ff4d4d; }
+        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 10px; }
         #container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
         
-        /* Karelerin yamulmasını engelleyen sabit grid */
         #board {
             display: grid;
             grid-template-columns: repeat(8, 50px);
@@ -24,34 +23,44 @@
         .dark { background: var(--dark); }
         .piece { font-size: 40px; z-index: 5; line-height: 1; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.4)); }
         .selected { background-color: var(--select) !important; }
+        .is-check { background-color: var(--check) !important; animation: pulse 1s infinite; }
+        
+        /* Taş sokulabilir alanları görselleştirme */
+        .drop-zone { box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3); }
+
         .dot { width: 12px; height: 12px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; z-index: 2; }
 
         #side { min-width: 180px; display: flex; flex-direction: column; gap: 10px; }
-        .panel { background: #252525; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; }
+        .panel { background: #252525; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #444; }
         #pool { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         #pool span { font-size: 28px; background: #333; border-radius: 5px; padding: 5px; cursor: pointer; border-bottom: 2px solid #000; }
         #pool span.disabled { opacity: 0.1; pointer-events: none; }
         #pool span.active { background: #779556 !important; }
 
-        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
         #overlay button { margin-top: 20px; padding: 10px 20px; cursor: pointer; background: #779556; border: none; color: white; border-radius: 5px; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
     <div id="overlay">
-        <h1 id="win-text">BEYAZ KAZANDI!</h1>
-        <button onclick="location.reload()">Tekrar Oyna</button>
+        <h1 id="win-text">ŞAH MAT!</h1>
+        <p id="sub-text"></p>
+        <button onclick="location.reload()">Yeniden Başlat</button>
     </div>
 
-    <h2 style="margin: 0 0 15px 0">♟️ Modlu Satranç (Bot'a Karşı)</h2>
+    <h2 style="margin: 5px">♟️ Gelişmiş Modlu Satranç</h2>
+    <p style="font-size: 0.8em; color: #aaa; margin-bottom: 10px;">Beyaz alt 2 sıraya, Siyah üst 2 sıraya taş ekleyebilir.</p>
 
     <div id="container">
         <div id="board"></div>
         <div id="side">
-            <div class="panel" id="turn">SIRA: SENDE</div>
+            <div class="panel" id="turn">SIRA: BEYAZ</div>
             <div class="panel" id="score">B: 0 | S: 0</div>
             <div id="pool" class="panel"></div>
+            <div class="panel" id="status" style="font-size: 0.9em; color: #ffbc00;"></div>
         </div>
     </div>
 
@@ -61,6 +70,7 @@
             const poolEl = document.getElementById("pool");
             const turnEl = document.getElementById("turn");
             const scoreEl = document.getElementById("score");
+            const statusEl = document.getElementById("status");
             const overlay = document.getElementById("overlay");
             const winText = document.getElementById("win-text");
 
@@ -73,38 +83,115 @@
             board[0][0] = { t: "k", c: "w" }; 
             board[7][7] = { t: "k", c: "b" }; 
 
-            let turn = "w"; // w: Oyuncu (Beyaz), b: Bot (Siyah)
+            let turn = "w"; 
             let score = { w: 0, b: 0 };
             let selected = null;
             let moves = [];
             let placing = null;
 
+            function isCheck(color, tempBoard = board) {
+                let kingPos = null;
+                for(let x=0; x<8; x++) {
+                    for(let y=0; y<8; y++) {
+                        if(tempBoard[x][y]?.t === 'k' && tempBoard[x][y]?.c === color) kingPos = {x, y};
+                    }
+                }
+                if(!kingPos) return false;
+
+                const oppColor = color === 'w' ? 'b' : 'w';
+                for(let x=0; x<8; x++) {
+                    for(let y=0; y<8; y++) {
+                        if(tempBoard[x][y] && tempBoard[x][y].c === oppColor) {
+                            const oppMoves = getRawMoves(x, y, oppColor, tempBoard);
+                            if(oppMoves.some(m => m.x === kingPos.x && m.y === kingPos.y)) return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            function getRawMoves(x, y, color, tempBoard) {
+                const res = [];
+                const p = tempBoard[x][y];
+                const add = (nx, ny) => {
+                    if (nx < 0 || ny < 0 || nx > 7 || ny > 7) return "stop";
+                    const target = tempBoard[nx][ny];
+                    if (!target) { res.push({ x: nx, y: ny }); return "cont"; }
+                    if (target.c !== color) { res.push({ x: nx, y: ny }); return "stop"; }
+                    return "stop";
+                };
+
+                const dirs = {
+                    r: [[1,0], [-1,0], [0,1], [0,-1]], b: [[1,1], [1,-1], [-1,1], [-1,-1]],
+                    n: [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [1,-2], [-1,2], [-1,-2]],
+                    q: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]],
+                    k: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]]
+                };
+
+                if (["r", "b", "q"].includes(p.t)) {
+                    dirs[p.t].forEach(d => {
+                        for (let i = 1; i < 8; i++) if (add(x + d[0] * i, y + d[1] * i) === "stop") break;
+                    });
+                } else if (p.t === "p") {
+                    const dir = color === "w" ? 1 : -1;
+                    if (y + dir >= 0 && y + dir < 8 && !tempBoard[x][y+dir]) res.push({x, y: y+dir});
+                    [[1, dir], [-1, dir]].forEach(d => {
+                        let nx = x + d[0], ny = y + d[1];
+                        if (nx>=0 && nx<8 && ny>=0 && ny<8 && tempBoard[nx][ny] && tempBoard[nx][ny].c !== color) res.push({x:nx, y:ny});
+                    });
+                } else {
+                    dirs[p.t].forEach(d => add(x + d[0], y + d[1]));
+                }
+                return res;
+            }
+
+            function getValidMoves(x, y) {
+                const raw = getRawMoves(x, y, turn, board);
+                return raw.filter(m => {
+                    const temp = board.map(row => [...row]);
+                    temp[m.x][m.y] = temp[x][y];
+                    temp[x][y] = null;
+                    return !isCheck(turn, temp);
+                });
+            }
+
             function draw() {
                 boardEl.innerHTML = "";
+                const inCheck = isCheck(turn);
+                if(inCheck) statusEl.textContent = "⚠️ ŞAH TEHDİDİ!"; else statusEl.textContent = "";
+
                 for (let y = 7; y >= 0; y--) {
                     for (let x = 0; x < 8; x++) {
                         const sq = document.createElement("div");
                         sq.className = `square ${(x + y) % 2 ? "dark" : "light"}`;
+                        
+                        // Taş ekleme bölgesi kontrolü
+                        if (placing) {
+                            const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
+                            if (isZone) sq.classList.add("drop-zone");
+                        }
+
                         const p = board[x][y];
                         if (p) {
                             const sp = document.createElement("div");
                             sp.className = "piece";
+                            if (p.t === 'k' && isCheck(p.c)) sq.classList.add("is-check");
                             if (selected && selected.x === x && selected.y === y) sq.classList.add("selected");
                             sp.textContent = PIECES[p.t].s;
                             sp.style.color = p.c === "w" ? "#fff" : "#000";
                             sq.appendChild(sp);
                         }
-                        if (moves.some(m => m.x === x && m.y === y) || (placing && !p)) {
+                        if (moves.some(m => m.x === x && m.y === y)) {
                             const d = document.createElement("div");
                             d.className = "dot";
                             sq.appendChild(d);
                         }
-                        sq.onclick = () => turn === "w" && click(x, y);
+                        sq.onclick = () => click(x, y);
                         boardEl.appendChild(sq);
                     }
                 }
-                turnEl.textContent = turn === "w" ? "SIRA: SENDE" : "SIRA: BOT...";
-                scoreEl.innerHTML = `PUAN<br>SEN: ${score.w} | BOT: ${score.b}`;
+                turnEl.textContent = turn === "w" ? "SIRA: BEYAZ" : "SIRA: SİYAH";
+                scoreEl.innerHTML = `B: ${score.w} | S: ${score.b}`;
                 drawPool();
             }
 
@@ -117,7 +204,6 @@
                     if (PIECES[k].c > score[turn]) s.className = "disabled";
                     if (placing === k) s.className = "active";
                     s.onclick = (e) => {
-                        if(turn !== "w") return;
                         e.stopPropagation();
                         placing = (placing === k) ? null : k;
                         selected = null; moves = [];
@@ -127,120 +213,73 @@
                 }
             }
 
-            function getMoves(x, y, color) {
-                const res = [];
-                const p = board[x][y];
-                if (!p) return res;
-
-                const add = (nx, ny) => {
-                    if (nx < 0 || ny < 0 || nx > 7 || ny > 7) return "stop";
-                    const target = board[nx][ny];
-                    if (!target) { res.push({ x: nx, y: ny }); return "cont"; }
-                    if (target.c !== color) { res.push({ x: nx, y: ny }); return "stop"; }
-                    return "stop";
-                };
-
-                const dirs = {
-                    r: [[1,0], [-1,0], [0,1], [0,-1]],
-                    b: [[1,1], [1,-1], [-1,1], [-1,-1]],
-                    n: [[2,1], [2,-1], [-2,1], [-2,-1], [1,2], [1,-2], [-1,2], [-1,-2]],
-                    q: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]],
-                    k: [[1,0], [-1,0], [0,1], [0,-1], [1,1], [1,-1], [-1,1], [-1,-1]]
-                };
-
-                if (["r", "b", "q"].includes(p.t)) {
-                    dirs[p.t].forEach(d => {
-                        for (let i = 1; i < 8; i++) if (add(x + d[0] * i, y + d[1] * i) === "stop") break;
-                    });
-                } else if (p.t === "p") {
-                    const dir = color === "w" ? 1 : -1;
-                    if (y + dir >= 0 && y + dir < 8 && !board[x][y+dir]) res.push({x, y: y+dir});
-                    [[1, dir], [-1, dir]].forEach(d => {
-                        let nx = x + d[0], ny = y + d[1];
-                        if (nx>=0 && nx<8 && ny>=0 && ny<8 && board[nx][ny] && board[nx][ny].c !== color) res.push({x:nx, y:ny});
-                    });
-                } else {
-                    dirs[p.t].forEach(d => add(x + d[0], y + d[1]));
-                }
-                return res;
-            }
-
             function click(x, y) {
                 const target = board[x][y];
                 if (placing) {
-                    if (!target && score[turn] >= PIECES[placing].c) {
-                        board[x][y] = { t: placing, c: turn };
-                        score[turn] -= PIECES[placing].c;
-                        placing = null; endTurn();
+                    const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
+                    if (!target && isZone && score[turn] >= PIECES[placing].c) {
+                        const temp = board.map(row => [...row]);
+                        temp[x][y] = { t: placing, c: turn };
+                        if(!isCheck(turn, temp)) {
+                            board[x][y] = { t: placing, c: turn };
+                            score[turn] -= PIECES[placing].c;
+                            placing = null; endTurn();
+                        } else {
+                            alert("Şah tehdit altındayken bunu yapamazsınız!");
+                        }
                     }
                 } else {
                     if (target && target.c === turn) {
-                        selected = { x, y }; moves = getMoves(x, y, turn);
+                        selected = { x, y }; moves = getValidMoves(x, y);
                     } else if (selected && moves.some(m => m.x === x && m.y === y)) {
-                        makeMove(selected.x, selected.y, x, y);
+                        board[x][y] = board[selected.x][selected.y];
+                        board[selected.x][selected.y] = null;
+                        
+                        // Piyon Terfisi
+                        if (board[x][y].t === 'p' && (y === 0 || y === 7)) {
+                            board[x][y].t = 'q'; // Otomatik Vezir (Basitlik için)
+                        }
+
+                        score[turn] = Math.min(10, score[turn] + 1);
+                        endTurn();
                     } else { selected = null; moves = []; }
                 }
                 draw();
             }
 
-            function makeMove(fx, fy, tx, ty) {
-                const target = board[tx][ty];
-                if (target && target.t === "k") {
-                    winText.textContent = (turn === "w" ? "TEBRİKLER!" : "BOT KAZANDI!");
-                    overlay.style.display = "flex";
+            function checkGameOver() {
+                for(let x=0; x<8; x++) {
+                    for(let y=0; y<8; y++) {
+                        if(board[x][y] && board[x][y].c === turn) {
+                            if(getValidMoves(x, y).length > 0) return false;
+                        }
+                    }
                 }
-                board[tx][ty] = board[fx][fy];
-                board[fx][fy] = null;
-                score[turn] = Math.min(10, score[turn] + 1);
-                endTurn();
+                // Puanla taş koyarak şahı kurtarabilir mi?
+                if (score[turn] > 0) {
+                    for(let x=0; x<8; x++) {
+                        for(let y=0; y<8; y++) {
+                            const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
+                            if (!board[x][y] && isZone) {
+                                const temp = board.map(row => [...row]);
+                                temp[x][y] = { t: 'p', c: turn };
+                                if(!isCheck(turn, temp)) return false;
+                            }
+                        }
+                    }
+                }
+                return true;
             }
 
             function endTurn() {
                 selected = null; moves = [];
                 turn = turn === "w" ? "b" : "w";
+                if(checkGameOver()) {
+                    overlay.style.display = "flex";
+                    document.getElementById("sub-text").textContent = (turn === 'w' ? "SİYAH" : "BEYAZ") + " KAZANDI!";
+                }
                 draw();
-                if (turn === "b") setTimeout(botPlay, 800);
             }
-
-            function botPlay() {
-                // 1. Taş Ekleme Kontrolü (Puan varsa ve şah tehlikedeyse veya rastgele)
-                const types = ['q', 'r', 'n', 'b', 'p'];
-                for (let type of types) {
-                    if (score.b >= PIECES[type].c) {
-                        let emptySquares = [];
-                        for(let i=0; i<8; i++) for(let j=0; j<8; j++) if(!board[i][j]) emptySquares.push({x:i, y:j});
-                        if (emptySquares.length > 0) {
-                            let r = emptySquares[Math.floor(Math.random() * emptySquares.length)];
-                            board[r.x][r.y] = { t: type, c: "b" };
-                            score.b -= PIECES[type].c;
-                            endTurn();
-                            return;
-                        }
-                    }
-                }
-
-                // 2. Taş Hareket Ettirme (En mantıklı hamleyi bul)
-                let allMoves = [];
-                for(let i=0; i<8; i++) {
-                    for(let j=0; j<8; j++) {
-                        if(board[i][j] && board[i][j].c === "b") {
-                            let mvs = getMoves(i, j, "b");
-                            mvs.forEach(m => allMoves.push({fx:i, fy:j, tx:m.x, ty:m.y, target: board[m.x][m.y]}));
-                        }
-                    }
-                }
-
-                if (allMoves.length > 0) {
-                    // Öncelik: Şah yemek > Herhangi bir taş yemek > Rastgele hamle
-                    let best = allMoves.find(m => m.target && m.target.t === 'k') || 
-                               allMoves.find(m => m.target) || 
-                               allMoves[Math.floor(Math.random() * allMoves.length)];
-                    makeMove(best.fx, best.fy, best.tx, best.ty);
-                } else {
-                    endTurn(); // Hamle yoksa (imkansız ama)
-                }
-            }
-
             draw();
         };
     </script>
