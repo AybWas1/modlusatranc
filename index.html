@@ -3,97 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Modlu Satranç (P2P)</title>
+    <title>Chess Fusion: Modlu Satranç</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root { --light: #ebecd0; --dark: #779556; --select: #ffff33; --check: #ff4d4d; }
-        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+        :root { 
+            --light: #f0d9b5; --dark: #b58863; 
+            --select: #f6f669; --check: #ff4d4d;
+            --bg: #2c3e50; --panel: #34495e;
+            --accent: #27ae60;
+        }
         
-        #network-panel { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; width: 400px; display: flex; flex-direction: column; gap: 10px; }
-        input { padding: 8px; border-radius: 4px; border: none; }
-        button { padding: 8px 15px; cursor: pointer; background: #779556; border: none; color: white; border-radius: 4px; font-weight: bold; }
-        button:disabled { background: #444; cursor: not-allowed; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        
+        /* Menü Ekranı */
+        #menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .menu-card { background: var(--panel); padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 320px; }
+        .menu-card h1 { margin-top: 0; color: var(--accent); font-size: 2.5em; letter-spacing: 2px; }
+        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: 0.3s; background: var(--accent); color: white; }
+        .menu-btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4); }
+        .menu-btn.secondary { background: #2980b9; }
 
-        #container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
-        #board { display: grid; grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); width: 400px; height: 400px; border: 5px solid #333; user-select: none; }
-        .square { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+        /* Oyun Alanı */
+        #game-ui { display: none; flex-direction: column; align-items: center; padding: 20px; }
+        #network-panel { background: var(--panel); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; width: 400px; }
+        
+        #board { display: grid; grid-template-columns: repeat(8, 55px); grid-template-rows: repeat(8, 55px); border: 8px solid #333; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .square { width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
         .light { background: var(--light); }
         .dark { background: var(--dark); }
-        .piece { font-size: 40px; z-index: 5; line-height: 1; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.4)); }
+        
+        /* Modern Taş Görünümü */
+        .piece { width: 48px; height: 48px; z-index: 5; background-size: contain; background-repeat: no-repeat; transition: transform 0.2s; }
+        .piece:hover { transform: scale(1.1); }
+        
         .selected { background-color: var(--select) !important; }
         .is-check { background-color: var(--check) !important; }
-        .dot { width: 14px; height: 14px; background: rgba(0,0,0,0.25); border-radius: 50%; position: absolute; z-index: 2; }
+        .dot { width: 16px; height: 16px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; z-index: 2; }
         
-        #side { min-width: 180px; display: flex; flex-direction: column; gap: 10px; }
-        .panel { background: #252525; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #444; }
-        #pool { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        #pool span { font-size: 28px; background: #333; border-radius: 5px; padding: 5px; cursor: pointer; border-bottom: 2px solid #000; }
-        #pool span.disabled { opacity: 0.1; pointer-events: none; }
-        #pool span.active { background: #779556 !important; }
+        #side { margin-top: 20px; width: 100%; display: flex; justify-content: space-between; gap: 10px; }
+        .stat-box { background: var(--panel); padding: 15px; border-radius: 8px; flex: 1; text-align: center; border-bottom: 4px solid rgba(0,0,0,0.3); }
+        
+        #pool { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; }
+        .pool-item { font-size: 32px; cursor: pointer; transition: 0.2s; border-radius: 5px; text-align: center; }
+        .pool-item:hover { background: rgba(255,255,255,0.1); }
+        .pool-item.active { background: var(--accent) !important; }
+        .pool-item.disabled { opacity: 0.2; cursor: not-allowed; }
 
-        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        #overlay h1 { font-size: 3em; margin-bottom: 20px; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 300; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div id="overlay">
-        <h1 id="win-text">ŞAH MAT!</h1>
-        <button onclick="location.reload()" style="font-size: 1.2em; padding: 15px 30px;">Tekrar Oyna</button>
-    </div>
-
-    <div id="network-panel">
-        <div id="my-id-display">ID'niz yükleniyor...</div>
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="peer-id-input" placeholder="Arkadaşının ID'sini gir">
-            <button id="connect-btn">Bağlan</button>
+    <div id="menu-overlay">
+        <div class="menu-card">
+            <h1>CHESS<br>FUSION</h1>
+            <p>Modlu P2P Satranç</p>
+            <button class="menu-btn" onclick="startAI()">Bota Karşı Oyna</button>
+            <button class="menu-btn secondary" onclick="showMultiplayer()">Arkadaşınla Oyna</button>
         </div>
-        <div id="status-text" style="font-size: 0.8em; color: #ffbc00;">Durum: Bekleniyor...</div>
     </div>
 
-    <div id="container">
+    <div id="overlay">
+        <h1 id="win-text">MAT!</h1>
+        <button class="menu-btn" style="width: 200px" onclick="location.reload()">Ana Menü</button>
+    </div>
+
+    <div id="game-ui">
+        <div id="network-panel" style="display:none;">
+            <div id="my-id-display">ID Alınıyor...</div>
+            <div style="display:flex; gap:5px; margin-top:5px;">
+                <input type="text" id="peer-id-input" placeholder="Arkadaş ID">
+                <button onclick="connectToPeer()" id="connect-btn">Bağlan</button>
+            </div>
+            <div id="status-text" style="font-size: 0.8em; color: #f1c40f; margin-top:5px;">Mod: Online</div>
+        </div>
+
         <div id="board"></div>
+
         <div id="side">
-            <div class="panel" id="turn-display">SIRA: BEYAZ</div>
-            <div class="panel" id="score-display">B: 0 | S: 0</div>
-            <div id="pool" class="panel"></div>
+            <div class="stat-box" id="turn-display">SIRA: BEYAZ</div>
+            <div class="stat-box" id="score-display">B: 2 | S: 2</div>
+        </div>
+
+        <div id="pool-container" style="width: 100%;">
+            <div id="pool"></div>
         </div>
     </div>
 
     <script>
-        const PIECES = { p: { s: "♙", c: 1 }, n: { s: "♘", c: 3 }, b: { s: "♗", c: 3 }, r: { s: "♖", c: 5 }, q: { s: "♕", c: 9 }, k: { s: "♔", c: 0 } };
-        
+        // Görsel taş setleri (SVG)
+        const PIECES = {
+            p: { s: "♟", c: 1, img: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg" },
+            n: { s: "♞", c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_ndt45.svg" },
+            b: { s: "♝", c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_bdt45.svg" },
+            r: { s: "♜", c: 5, img: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg" },
+            q: { s: "♛", c: 9, img: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg" },
+            k: { s: "♚", c: 0, img: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg" }
+        };
+
+        const PIECES_WHITE = {
+            p: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg",
+            n: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg",
+            b: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg",
+            r: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
+            q: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg",
+            k: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg"
+        };
+
+        let isAI = false;
         let peer, conn;
-        let myRole = null; 
+        let myRole = 'w'; // Bot'a karşı her zaman beyazız
         let board = [...Array(8)].map(() => Array(8).fill(null));
         let turn = "w";
-        let score = { w: 2, b: 2 }; 
+        let score = { w: 2, b: 2 };
         let selected = null, moves = [], placing = null;
 
+        // --- MENÜ KONTROLLERİ ---
+        function startAI() {
+            isAI = true;
+            document.getElementById('menu-overlay').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'flex';
+            initGame();
+            draw();
+        }
+
+        function showMultiplayer() {
+            document.getElementById('menu-overlay').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'flex';
+            document.getElementById('network-panel').style.display = 'block';
+            initPeer();
+            initGame();
+            draw();
+        }
+
+        // --- NETWORK (P2P) ---
         function initPeer() {
             peer = new Peer();
             peer.on('open', id => {
-                document.getElementById('my-id-display').innerHTML = `ID'niz: <b>${id}</b> <button onclick="navigator.clipboard.writeText('${id}')">Kopyala</button>`;
+                document.getElementById('my-id-display').innerHTML = `ID'niz: <b>${id}</b> <button onclick="navigator.clipboard.writeText('${id}')">📋</button>`;
             });
             peer.on('connection', c => {
-                conn = c;
-                myRole = 'w';
-                setupConnection();
+                conn = c; myRole = 'w'; setupConnection();
             });
         }
 
-        document.getElementById('connect-btn').onclick = () => {
-            const peerId = document.getElementById('peer-id-input').value;
-            if(!peerId) return;
-            conn = peer.connect(peerId);
-            myRole = 'b';
-            setupConnection();
-        };
+        function connectToPeer() {
+            const id = document.getElementById('peer-id-input').value;
+            if(!id) return;
+            conn = peer.connect(id); myRole = 'b'; setupConnection();
+        }
 
         function setupConnection() {
             conn.on('open', () => {
-                document.getElementById('status-text').textContent = `Bağlandı! Rolünüz: ${myRole === 'w' ? 'Beyaz' : 'Siyah'}`;
-                initGame();
+                document.getElementById('status-text').textContent = "Durum: Bağlandı!";
                 draw();
             });
             conn.on('data', data => {
@@ -102,8 +164,57 @@
             });
         }
 
-        function sendData(data) { if (conn && conn.open) conn.send(data); }
+        // --- BOT ZEKASI ---
+        function runAI() {
+            if (!isAI || turn === 'w') return;
 
+            setTimeout(() => {
+                // 1. Şah altındaysa kurtulmaya çalış (Hamle simülasyonu)
+                let bestMove = null;
+                const allLegalMoves = [];
+                
+                for(let x=0; x<8; x++){
+                    for(let y=0; y<8; y++){
+                        if(board[x][y]?.c === 'b'){
+                            const mvs = getRawMoves(x, y, 'b', board).filter(m => {
+                                const tmp = board.map(r => [...r]);
+                                tmp[m.x][m.y] = tmp[x][y]; tmp[x][y] = null;
+                                return !isCheck('b', tmp);
+                            });
+                            mvs.forEach(m => allLegalMoves.push({fx:x, fy:y, tx:m.x, ty:m.y, val: evaluateMove(m.x, m.y)}));
+                        }
+                    }
+                }
+
+                // 2. Taş koyma imkanı (Şah çekilmiyorsa)
+                if (!isCheck('b')) {
+                    const zone = [];
+                    for(let x=0; x<8; x++) for(let y=6; y<8; y++) if(!board[x][y]) zone.push({x,y});
+                    
+                    const afford = Object.entries(PIECES).filter(([k, p]) => p.c > 0 && p.c <= score.b);
+                    if(afford.length > 0 && zone.length > 0) {
+                        const randomZone = zone[Math.floor(Math.random() * zone.length)];
+                        const bestPiece = afford.sort((a,b) => b[1].c - a[1].c)[0][0];
+                        executePlace(randomZone.x, randomZone.y, bestPiece, false);
+                        return;
+                    }
+                }
+
+                if (allLegalMoves.length > 0) {
+                    // En yüksek değerli taşı yeme önceliği
+                    allLegalMoves.sort((a,b) => b.val - a.val);
+                    bestMove = allLegalMoves[0];
+                    executeMove(bestMove.fx, bestMove.fy, bestMove.tx, bestMove.ty, false);
+                }
+            }, 800);
+        }
+
+        function evaluateMove(tx, ty) {
+            if (!board[tx][ty]) return 0;
+            return PIECES[board[tx][ty].t].c;
+        }
+
+        // --- OYUN KURALLARI ---
         function initGame() {
             board = [...Array(8)].map(() => Array(8).fill(null));
             board[0][0] = { t: "k", c: "w" };
@@ -145,7 +256,6 @@
         }
 
         function isGameOver(color) {
-            // Şah tehdidi altındayken oyuncu tahtadaki taşlarla hamle yapabiliyor mu?
             for (let x=0; x<8; x++) {
                 for (let y=0; y<8; y++) {
                     if (board[x][y]?.c === color) {
@@ -157,7 +267,6 @@
                     }
                 }
             }
-            // Şah çekilmiyorken (Normal durum veya Pat) dışarıdan taş koyabilir mi?
             if (!isCheck(color)) {
                 const canAfford = Object.values(PIECES).some(p => p.c > 0 && p.c <= score[color]);
                 const zoneAvailable = board.some((col, x) => col.some((sq, y) => !sq && ((color==='w' && y<2) || (color==='b' && y>5))));
@@ -168,13 +277,7 @@
 
         function click(x, y) {
             if (turn !== myRole) return;
-            
-            // Eğer ŞAH çekiliyorsa taş koymayı (placing) engelle
-            if (placing && isCheck(turn)) {
-                placing = null;
-                draw();
-                return;
-            }
+            if (placing && (isCheck(turn) || board[x][y])) { placing = null; draw(); return; }
 
             if (placing) {
                 const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
@@ -199,14 +302,14 @@
             board[fx][fy] = null;
             if (board[tx][ty].t === 'p' && (ty === 0 || ty === 7)) board[tx][ty].t = 'q';
             score[turn] = Math.min(15, score[turn] + 1);
-            if (isLocal) sendData({ type: 'move', fx, fy, tx, ty });
+            if (isLocal && conn) conn.send({ type: 'move', fx, fy, tx, ty });
             endTurn();
         }
 
         function executePlace(x, y, piece, isLocal) {
             board[x][y] = { t: piece, c: turn };
             score[turn] -= PIECES[piece].c;
-            if (isLocal) sendData({ type: 'place', x, y, piece });
+            if (isLocal && conn) conn.send({ type: 'place', x, y, piece });
             placing = null;
             endTurn();
         }
@@ -216,15 +319,13 @@
             let nextTurn = (turn === "w") ? "b" : "w";
             if (isGameOver(nextTurn)) {
                 draw();
-                const msg = isCheck(nextTurn) ? (turn === "w" ? "BEYAZ KAZANDI!" : "SİYAH KAZANDI!") : "BERABERE (PAT)";
-                setTimeout(() => {
-                    document.getElementById("win-text").textContent = msg;
-                    document.getElementById("overlay").style.display = "flex";
-                }, 500);
+                document.getElementById("win-text").textContent = isCheck(nextTurn) ? (turn === "w" ? "BEYAZ KAZANDI!" : "SİYAH KAZANDI!") : "BERABERE!";
+                document.getElementById("overlay").style.display = "flex";
                 return;
             }
             turn = nextTurn;
             draw();
+            if (isAI && turn === 'b') runAI();
         }
 
         function draw() {
@@ -238,10 +339,10 @@
                     if (p) {
                         const sp = document.createElement("div");
                         sp.className = "piece";
+                        const imgUrl = p.c === 'w' ? PIECES_WHITE[p.t] : PIECES[p.t].img;
+                        sp.style.backgroundImage = `url(${imgUrl})`;
                         if (p.t === 'k' && isCheck(p.c)) sq.classList.add("is-check");
                         if (selected && selected.x === x && selected.y === y) sq.classList.add("selected");
-                        sp.textContent = PIECES[p.t].s;
-                        sp.style.color = p.c === "w" ? "#fff" : "#000";
                         sq.appendChild(sp);
                     }
                     const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
@@ -252,8 +353,8 @@
                     boardEl.appendChild(sq);
                 }
             }
-            document.getElementById("turn-display").textContent = "SIRA: " + (turn === 'w' ? "BEYAZ" : "SİYAH") + (turn === myRole ? " (SİZDE)" : "");
-            document.getElementById("score-display").textContent = `B: ${score.w} | S: ${score.b}`;
+            document.getElementById("turn-display").textContent = "SIRA: " + (turn === 'w' ? "BEYAZ" : "SİYAH");
+            document.getElementById("score-display").textContent = `BEYAZ: ${score.w} | SİYAH: ${score.b}`;
             drawPool();
         }
 
@@ -263,11 +364,12 @@
             const currentlyInCheck = isCheck(turn);
             for (const k in PIECES) {
                 if (k === 'k') continue;
-                const s = document.createElement("span");
-                s.textContent = PIECES[k].s;
-                // Şah altındaysan veya paran yetmiyorsa butonları deaktive et
-                if (PIECES[k].c > score[turn] || turn !== myRole || currentlyInCheck) s.className = "disabled";
-                if (placing === k) s.className = "active";
+                const s = document.createElement("div");
+                s.className = "pool-item";
+                const imgUrl = turn === 'w' ? PIECES_WHITE[k] : PIECES[k].img;
+                s.innerHTML = `<img src="${imgUrl}" width="35"> <div style="font-size:10px">${PIECES[k].c}P</div>`;
+                if (PIECES[k].c > score[turn] || turn !== myRole || currentlyInCheck) s.classList.add("disabled");
+                if (placing === k) s.classList.add("active");
                 s.onclick = (e) => { 
                     e.stopPropagation(); 
                     if(turn === myRole && !currentlyInCheck) placing = (placing === k ? null : k); 
@@ -277,7 +379,6 @@
             }
         }
 
-        initPeer();
         initGame();
         draw();
     </script>
