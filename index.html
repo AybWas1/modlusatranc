@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chess Fusion: Görsel Fix</title>
+    <title>Chess Fusion: Persistent Nick</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { 
@@ -20,9 +20,11 @@
         }
         
         #menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .menu-card { background: var(--panel); padding: 30px; border-radius: 20px; width: 100%; max-width: 350px; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 2px solid #334; background: #0f172a; color: white; }
-        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; background: var(--accent); color: white; }
+        .menu-card { background: var(--panel); padding: 30px; border-radius: 20px; width: 100%; max-width: 350px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 2px solid #334; background: #0f172a; color: white; font-size: 1em; }
+        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; background: var(--accent); color: white; transition: 0.2s; }
+        .menu-btn:active { transform: scale(0.98); }
 
         #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; padding: 10px; }
         #board-container { width: 100%; aspect-ratio: 1/1; margin-bottom: 15px; }
@@ -37,48 +39,52 @@
         .dot { width: 30%; height: 30%; background: rgba(0,0,0,0.15); border-radius: 50%; position: absolute; z-index: 2; }
 
         #side { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .stat-box { background: var(--panel); padding: 10px; border-radius: 10px; text-align: center; font-size: 0.8em; }
+        .stat-box { background: var(--panel); padding: 10px; border-radius: 10px; text-align: center; font-size: 0.8em; border: 1px solid #334; }
         
         #pool { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; background: var(--panel); padding: 10px; border-radius: 15px; }
         .pool-item { display: flex; flex-direction: column; align-items: center; padding: 5px; border-radius: 8px; cursor: pointer; }
-        .pool-item img { width: 30px; height: 30px; object-fit: contain; }
+        .pool-item img { width: 30px; height: 30px; }
         .pool-item span { font-size: 10px; margin-top: 4px; }
         .pool-item.active { background: var(--accent); }
         .pool-item.disabled { opacity: 0.2; pointer-events: none; }
 
-        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 300; flex-direction: column; align-items: center; justify-content: center; }
+        #nick-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 20px; font-size: 0.7em; color: var(--accent); }
     </style>
 </head>
 <body>
 
     <div id="menu-overlay">
         <div class="menu-card">
-            <h1 style="color:var(--accent);">CHESS FUSION</h1>
-            <input type="text" id="my-nick" placeholder="Senin Nick'in">
-            <button class="menu-btn" onclick="startAI()">Bota Karşı</button>
+            <h1 style="color:var(--accent); margin:0 0 10px 0;">CHESS FUSION</h1>
+            
+            <div id="nick-section">
+                <p style="font-size: 0.9em; margin-bottom: 5px;">Kendi İsmin:</p>
+                <input type="text" id="my-nick" placeholder="Nickini yaz...">
+            </div>
+
+            <button class="menu-btn" onclick="startAI()">Bota Karşı Oyna</button>
+            
             <div style="border-top: 1px solid #334; margin: 15px 0;"></div>
-            <input type="text" id="peer-nick" placeholder="Arkadaşının Nick'i">
+            
+            <p style="font-size: 0.9em; margin-bottom: 5px;">Arkadaşına Bağlan:</p>
+            <input type="text" id="peer-nick" placeholder="Arkadaşının Nickini yaz...">
             <button class="menu-btn" style="background:#2980b9" onclick="startMultiplayer()">Bağlan</button>
+            
+            <button onclick="resetNick()" style="background:transparent; border:none; color:#666; font-size:0.7em; margin-top:10px; text-decoration:underline;">İsmimi Değiştir</button>
         </div>
     </div>
 
-    <div id="overlay">
-        <h1 id="win-text">MAT!</h1>
-        <button class="menu-btn" style="max-width:200px" onclick="location.reload()">Tekrar Oyna</button>
-    </div>
-
     <div id="game-ui">
+        <div id="nick-tag"></div>
         <div id="board-container"><div id="board"></div></div>
         <div id="side">
             <div class="stat-box" id="turn-display">SIRA: BEYAZ</div>
             <div class="stat-box" id="score-display">B: 2 | S: 2</div>
         </div>
         <div id="pool"></div>
-        <div id="nick-display" style="margin-top:10px; font-size:0.8em; color:var(--accent)"></div>
     </div>
 
     <script>
-        // Wikipedia'dan en stabil ve garanti linkler
         const PIECE_IMAGES = {
             'w': {
                 p: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg",
@@ -90,8 +96,8 @@
             },
             'b': {
                 p: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg",
-                n: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg", // Düzeltilmiş At
-                b: "https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg", // Düzeltilmiş Fil
+                n: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg",
+                b: "https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg",
                 r: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg",
                 q: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg",
                 k: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg"
@@ -99,17 +105,44 @@
         };
 
         const PIECES_DATA = { p:1, n:3, b:3, r:5, q:9, k:0 };
-
-        let isAI = false, peer, conn, myRole = 'w', myNick = "";
+        let isAI = false, peer, conn, myRole = 'w', currentNick = "";
         let board = [...Array(8)].map(() => Array(8).fill(null));
         let turn = "w", score = { w: 2, b: 2 };
         let selected = null, moves = [], placing = null;
 
+        // --- HAFIZA SİSTEMİ ---
+        window.onload = () => {
+            const savedNick = localStorage.getItem('chessFusionNick');
+            if(savedNick) {
+                currentNick = savedNick;
+                document.getElementById('my-nick').value = savedNick;
+                document.getElementById('my-nick').style.background = "#1e293b";
+            }
+        };
+
+        function resetNick() {
+            localStorage.removeItem('chessFusionNick');
+            document.getElementById('my-nick').value = "";
+            alert("İsim temizlendi. Yeni bir isim yazabilirsin.");
+        }
+
+        function saveNick(nick) {
+            localStorage.setItem('chessFusionNick', nick);
+            currentNick = nick;
+        }
+
+        // --- BAĞLANTI SİSTEMİ ---
         function initPeer(nick) {
             peer = new Peer(nick); 
             peer.on('open', (id) => {
-                document.getElementById('nick-display').textContent = "Nick: " + id;
+                document.getElementById('nick-tag').textContent = "Nick: " + id;
                 if(isAI) finalizeUI();
+            });
+            peer.on('error', err => {
+                if(err.type === 'unavailable-id') {
+                    alert("Bu isim şu an başka biri tarafından kullanılıyor!");
+                    location.reload();
+                }
             });
             peer.on('connection', c => {
                 conn = c; myRole = 'w'; setupConnection(); finalizeUI();
@@ -117,16 +150,20 @@
         }
 
         function startAI() {
-            myNick = document.getElementById('my-nick').value.trim();
-            if(!myNick) return alert("Nick gir!");
+            const nick = document.getElementById('my-nick').value.trim();
+            if(!nick) return alert("Lütfen önce bir isim yaz!");
+            saveNick(nick);
             isAI = true; finalizeUI();
         }
 
         function startMultiplayer() {
-            myNick = document.getElementById('my-nick').value.trim();
+            const nick = document.getElementById('my-nick').value.trim();
             const target = document.getElementById('peer-nick').value.trim();
-            if(!myNick || !target) return alert("Nickleri gir!");
-            initPeer(myNick);
+            if(!nick || !target) return alert("Kendi ismini ve arkadaşının ismini yazmalısın!");
+            
+            saveNick(nick);
+            initPeer(nick);
+            
             setTimeout(() => {
                 conn = peer.connect(target);
                 myRole = 'b';
@@ -148,6 +185,7 @@
             });
         }
 
+        // --- OYUN MANTIĞI ---
         function initGame() { board[0][0]={t:"k",c:"w"}; board[7][7]={t:"k",c:"b"}; }
 
         function isCheck(color, tmpB = board) {
