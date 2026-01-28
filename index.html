@@ -2,244 +2,181 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Fusion: Modlu Satranç</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chess Fusion: Mobile Optimized</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { 
             --light: #f0d9b5; --dark: #b58863; 
             --select: #f6f669; --check: #ff4d4d;
-            --bg: #2c3e50; --panel: #34495e;
-            --accent: #27ae60;
+            --bg: #1a1a2e; --panel: #16213e;
+            --accent: #4e9f3d;
         }
         
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        * { box-sizing: border-box; touch-action: manipulation; }
+
+        body { 
+            margin: 0; background: var(--bg); color: white; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh; overflow-x: hidden;
+        }
         
         /* Menü Ekranı */
-        #menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        .menu-card { background: var(--panel); padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 320px; }
-        .menu-card h1 { margin-top: 0; color: var(--accent); font-size: 2.5em; letter-spacing: 2px; }
-        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: 0.3s; background: var(--accent); color: white; }
-        .menu-btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4); }
-        .menu-btn.secondary { background: #2980b9; }
+        #menu-overlay { 
+            position: fixed; inset: 0; background: rgba(0,0,0,0.95); 
+            z-index: 200; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .menu-card { 
+            background: var(--panel); padding: 30px; border-radius: 20px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 350px; text-align: center;
+        }
+        .menu-btn { 
+            width: 100%; padding: 15px; margin: 10px 0; border: none; 
+            border-radius: 12px; font-size: 1.1em; font-weight: bold; 
+            cursor: pointer; transition: 0.2s; background: var(--accent); color: white; 
+        }
 
-        /* Oyun Alanı */
-        #game-ui { display: none; flex-direction: column; align-items: center; padding: 20px; }
-        #network-panel { background: var(--panel); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #444; width: 400px; }
-        
-        #board { display: grid; grid-template-columns: repeat(8, 55px); grid-template-rows: repeat(8, 55px); border: 8px solid #333; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-        .square { width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+        /* Oyun Alanı Konteynırı */
+        #game-ui { 
+            display: none; flex-direction: column; align-items: center; 
+            width: 100%; max-width: 500px; padding: 10px; 
+        }
+
+        /* Responsive Tahta */
+        #board-container {
+            width: 100%; aspect-ratio: 1/1; 
+            display: flex; justify-content: center; align-items: center;
+            margin-bottom: 15px;
+        }
+        #board { 
+            display: grid; grid-template-columns: repeat(8, 1fr); 
+            grid-template-rows: repeat(8, 1fr); 
+            width: 100%; height: 100%;
+            border: 4px solid #333; border-radius: 4px; overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+
+        .square { display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
         .light { background: var(--light); }
         .dark { background: var(--dark); }
         
-        /* Modern Taş Görünümü */
-        .piece { width: 48px; height: 48px; z-index: 5; background-size: contain; background-repeat: no-repeat; transition: transform 0.2s; }
-        .piece:hover { transform: scale(1.1); }
+        .piece { 
+            width: 90%; height: 90%; background-size: contain; 
+            background-repeat: no-repeat; background-position: center; 
+            z-index: 5; pointer-events: none;
+        }
         
         .selected { background-color: var(--select) !important; }
         .is-check { background-color: var(--check) !important; }
-        .dot { width: 16px; height: 16px; background: rgba(0,0,0,0.2); border-radius: 50%; position: absolute; z-index: 2; }
-        
-        #side { margin-top: 20px; width: 100%; display: flex; justify-content: space-between; gap: 10px; }
-        .stat-box { background: var(--panel); padding: 15px; border-radius: 8px; flex: 1; text-align: center; border-bottom: 4px solid rgba(0,0,0,0.3); }
-        
-        #pool { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; }
-        .pool-item { font-size: 32px; cursor: pointer; transition: 0.2s; border-radius: 5px; text-align: center; }
-        .pool-item:hover { background: rgba(255,255,255,0.1); }
-        .pool-item.active { background: var(--accent) !important; }
-        .pool-item.disabled { opacity: 0.2; cursor: not-allowed; }
+        .dot { width: 30%; height: 30%; background: rgba(0,0,0,0.15); border-radius: 50%; position: absolute; z-index: 2; }
 
-        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 300; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        /* Mobil Alt Panel */
+        #side { 
+            width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;
+        }
+        .stat-box { 
+            background: var(--panel); padding: 10px; border-radius: 10px; 
+            text-align: center; font-size: 0.9em; font-weight: bold; border: 1px solid #334;
+        }
+        
+        #pool { 
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; 
+            width: 100%; background: var(--panel); padding: 10px; border-radius: 15px;
+        }
+        .pool-item { 
+            display: flex; flex-direction: column; align-items: center; 
+            padding: 8px 4px; border-radius: 8px; transition: 0.2s;
+        }
+        .pool-item img { width: 32px; height: 32px; }
+        .pool-item span { font-size: 10px; margin-top: 4px; color: #aaa; }
+        .pool-item.active { background: var(--accent) !important; }
+        .pool-item.disabled { opacity: 0.2; grayscale: 1; }
+
+        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 300; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
     <div id="menu-overlay">
         <div class="menu-card">
-            <h1>CHESS<br>FUSION</h1>
-            <p>Modlu P2P Satranç</p>
+            <h1 style="color:var(--accent); margin:0 0 20px 0;">CHESS FUSION</h1>
             <button class="menu-btn" onclick="startAI()">Bota Karşı Oyna</button>
-            <button class="menu-btn secondary" onclick="showMultiplayer()">Arkadaşınla Oyna</button>
+            <button class="menu-btn" style="background:#2980b9" onclick="showMultiplayer()">Arkadaşınla Oyna</button>
         </div>
     </div>
 
     <div id="overlay">
-        <h1 id="win-text">MAT!</h1>
-        <button class="menu-btn" style="width: 200px" onclick="location.reload()">Ana Menü</button>
+        <h1 id="win-text" style="font-size: 2.5em; margin-bottom: 20px;">MAT!</h1>
+        <button class="menu-btn" style="max-width:200px" onclick="location.reload()">Tekrar Oyna</button>
     </div>
 
     <div id="game-ui">
-        <div id="network-panel" style="display:none;">
-            <div id="my-id-display">ID Alınıyor...</div>
-            <div style="display:flex; gap:5px; margin-top:5px;">
-                <input type="text" id="peer-id-input" placeholder="Arkadaş ID">
-                <button onclick="connectToPeer()" id="connect-btn">Bağlan</button>
-            </div>
-            <div id="status-text" style="font-size: 0.8em; color: #f1c40f; margin-top:5px;">Mod: Online</div>
+        <div id="board-container">
+            <div id="board"></div>
         </div>
-
-        <div id="board"></div>
 
         <div id="side">
             <div class="stat-box" id="turn-display">SIRA: BEYAZ</div>
             <div class="stat-box" id="score-display">B: 2 | S: 2</div>
         </div>
 
-        <div id="pool-container" style="width: 100%;">
-            <div id="pool"></div>
+        <div id="pool"></div>
+        
+        <div id="network-panel" style="display:none; margin-top:15px; width:100%; background:var(--panel); padding:10px; border-radius:10px; font-size:0.8em;">
+            <div id="my-id-display">ID Alınıyor...</div>
+            <div style="display:flex; gap:5px; margin-top:5px;">
+                <input type="text" id="peer-id-input" placeholder="Arkadaş ID" style="flex:1; padding:8px; border-radius:5px; border:none;">
+                <button onclick="connectToPeer()" style="padding:8px; background:var(--accent); border:none; color:white; border-radius:5px;">Bağlan</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // Görsel taş setleri (SVG)
         const PIECES = {
-            p: { s: "♟", c: 1, img: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg" },
-            n: { s: "♞", c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_ndt45.svg" },
-            b: { s: "♝", c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_bdt45.svg" },
-            r: { s: "♜", c: 5, img: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg" },
-            q: { s: "♛", c: 9, img: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg" },
-            k: { s: "♚", c: 0, img: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg" }
+            p: { c: 1, img: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg" },
+            n: { c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_ndt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg" },
+            b: { c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_bdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg" },
+            r: { c: 5, img: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg" },
+            q: { c: 9, img: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg" },
+            k: { c: 0, img: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg" }
         };
 
-        const PIECES_WHITE = {
-            p: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg",
-            n: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg",
-            b: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg",
-            r: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
-            q: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg",
-            k: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg"
-        };
-
-        let isAI = false;
-        let peer, conn;
-        let myRole = 'w'; // Bot'a karşı her zaman beyazız
+        let isAI = false, peer, conn, myRole = 'w';
         let board = [...Array(8)].map(() => Array(8).fill(null));
-        let turn = "w";
-        let score = { w: 2, b: 2 };
+        let turn = "w", score = { w: 2, b: 2 };
         let selected = null, moves = [], placing = null;
 
-        // --- MENÜ KONTROLLERİ ---
-        function startAI() {
-            isAI = true;
-            document.getElementById('menu-overlay').style.display = 'none';
-            document.getElementById('game-ui').style.display = 'flex';
-            initGame();
-            draw();
-        }
+        function startAI() { isAI = true; finalizeUI(); }
+        function showMultiplayer() { document.getElementById('network-panel').style.display = 'block'; initPeer(); finalizeUI(); }
+        function finalizeUI() { document.getElementById('menu-overlay').style.display = 'none'; document.getElementById('game-ui').style.display = 'flex'; initGame(); draw(); }
 
-        function showMultiplayer() {
-            document.getElementById('menu-overlay').style.display = 'none';
-            document.getElementById('game-ui').style.display = 'flex';
-            document.getElementById('network-panel').style.display = 'block';
-            initPeer();
-            initGame();
-            draw();
-        }
-
-        // --- NETWORK (P2P) ---
         function initPeer() {
             peer = new Peer();
-            peer.on('open', id => {
-                document.getElementById('my-id-display').innerHTML = `ID'niz: <b>${id}</b> <button onclick="navigator.clipboard.writeText('${id}')">📋</button>`;
-            });
-            peer.on('connection', c => {
-                conn = c; myRole = 'w'; setupConnection();
-            });
+            peer.on('open', id => document.getElementById('my-id-display').innerHTML = `ID: <b>${id}</b>`);
+            peer.on('connection', c => { conn = c; myRole = 'w'; setupConnection(); });
         }
+        function connectToPeer() { const id = document.getElementById('peer-id-input').value; if(id){ conn = peer.connect(id); myRole = 'b'; setupConnection(); } }
+        function setupConnection() { conn.on('open', () => draw()); conn.on('data', d => { if(d.type==='move') executeMove(d.fx,d.fy,d.tx,d.ty,false); else if(d.type==='place') executePlace(d.x,d.y,d.piece,false); }); }
 
-        function connectToPeer() {
-            const id = document.getElementById('peer-id-input').value;
-            if(!id) return;
-            conn = peer.connect(id); myRole = 'b'; setupConnection();
-        }
+        function initGame() { board[0][0] = { t: "k", c: "w" }; board[7][7] = { t: "k", c: "b" }; }
 
-        function setupConnection() {
-            conn.on('open', () => {
-                document.getElementById('status-text').textContent = "Durum: Bağlandı!";
-                draw();
-            });
-            conn.on('data', data => {
-                if (data.type === 'move') executeMove(data.fx, data.fy, data.tx, data.ty, false);
-                else if (data.type === 'place') executePlace(data.x, data.y, data.piece, false);
-            });
-        }
-
-        // --- BOT ZEKASI ---
-        function runAI() {
-            if (!isAI || turn === 'w') return;
-
-            setTimeout(() => {
-                // 1. Şah altındaysa kurtulmaya çalış (Hamle simülasyonu)
-                let bestMove = null;
-                const allLegalMoves = [];
-                
-                for(let x=0; x<8; x++){
-                    for(let y=0; y<8; y++){
-                        if(board[x][y]?.c === 'b'){
-                            const mvs = getRawMoves(x, y, 'b', board).filter(m => {
-                                const tmp = board.map(r => [...r]);
-                                tmp[m.x][m.y] = tmp[x][y]; tmp[x][y] = null;
-                                return !isCheck('b', tmp);
-                            });
-                            mvs.forEach(m => allLegalMoves.push({fx:x, fy:y, tx:m.x, ty:m.y, val: evaluateMove(m.x, m.y)}));
-                        }
-                    }
-                }
-
-                // 2. Taş koyma imkanı (Şah çekilmiyorsa)
-                if (!isCheck('b')) {
-                    const zone = [];
-                    for(let x=0; x<8; x++) for(let y=6; y<8; y++) if(!board[x][y]) zone.push({x,y});
-                    
-                    const afford = Object.entries(PIECES).filter(([k, p]) => p.c > 0 && p.c <= score.b);
-                    if(afford.length > 0 && zone.length > 0) {
-                        const randomZone = zone[Math.floor(Math.random() * zone.length)];
-                        const bestPiece = afford.sort((a,b) => b[1].c - a[1].c)[0][0];
-                        executePlace(randomZone.x, randomZone.y, bestPiece, false);
-                        return;
-                    }
-                }
-
-                if (allLegalMoves.length > 0) {
-                    // En yüksek değerli taşı yeme önceliği
-                    allLegalMoves.sort((a,b) => b.val - a.val);
-                    bestMove = allLegalMoves[0];
-                    executeMove(bestMove.fx, bestMove.fy, bestMove.tx, bestMove.ty, false);
-                }
-            }, 800);
-        }
-
-        function evaluateMove(tx, ty) {
-            if (!board[tx][ty]) return 0;
-            return PIECES[board[tx][ty].t].c;
-        }
-
-        // --- OYUN KURALLARI ---
-        function initGame() {
-            board = [...Array(8)].map(() => Array(8).fill(null));
-            board[0][0] = { t: "k", c: "w" };
-            board[7][7] = { t: "k", c: "b" };
-        }
-
-        function isCheck(color, tempBoard = board) {
-            let kingPos = null;
-            for(let x=0; x<8; x++) for(let y=0; y<8; y++) if(tempBoard[x][y]?.t === 'k' && tempBoard[x][y]?.c === color) kingPos = {x, y};
-            if(!kingPos) return false;
-            const opp = color === 'w' ? 'b' : 'w';
-            for(let x=0; x<8; x++) for(let y=0; y<8; y++) {
-                if(tempBoard[x][y] && tempBoard[x][y].c === opp) {
-                    if(getRawMoves(x, y, opp, tempBoard).some(m => m.x === kingPos.x && m.y === kingPos.y)) return true;
-                }
-            }
+        function isCheck(color, tmpB = board) {
+            let kPos = null;
+            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(tmpB[x][y]?.t==='k' && tmpB[x][y]?.c===color) kPos = {x,y};
+            if(!kPos) return false;
+            const opp = color==='w'?'b':'w';
+            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(tmpB[x][y]?.c===opp && getRawMoves(x,y,opp,tmpB).some(m=>m.x===kPos.x && m.y===kPos.y)) return true;
             return false;
         }
 
-        function getRawMoves(x, y, color, tempBoard) {
-            const res = [], p = tempBoard[x][y];
+        function getRawMoves(x, y, color, tmpB) {
+            const res = [], p = tmpB[x][y];
             const add = (nx, ny) => {
-                if (nx<0 || ny<0 || nx>7 || ny>7) return "stop";
-                if (!tempBoard[nx][ny]) { res.push({x:nx, y:ny}); return "cont"; }
-                if (tempBoard[nx][ny].c !== color) { res.push({x:nx, y:ny}); return "stop"; }
+                if (nx<0||ny<0||nx>7||ny>7) return "stop";
+                if (!tmpB[nx][ny]) { res.push({x:nx,y:ny}); return "cont"; }
+                if (tmpB[nx][ny].c!==color) { res.push({x:nx,y:ny}); return "stop"; }
                 return "stop";
             };
             const ds = {
@@ -249,137 +186,133 @@
             if (["r","b","q"].includes(p.t)) ds[p.t].forEach(d => { for(let i=1;i<8;i++) if(add(x+d[0]*i, y+d[1]*i)==="stop") break; });
             else if (p.t === "p") {
                 const dir = color === "w" ? 1 : -1;
-                if (y+dir>=0 && y+dir<8 && !tempBoard[x][y+dir]) res.push({x, y:y+dir});
-                [[1,dir],[-1,dir]].forEach(d => { let nx=x+d[0], ny=y+d[1]; if(nx>=0 && nx<8 && ny>=0 && ny<8 && tempBoard[nx][ny] && tempBoard[nx][ny].c !== color) res.push({x:nx, y:ny}); });
+                if (y+dir>=0 && y+dir<8 && !tmpB[x][y+dir]) res.push({x, y:y+dir});
+                [[1,dir],[-1,dir]].forEach(d => { let nx=x+d[0], ny=y+d[1]; if(nx>=0&&nx<8&&ny>=0&&ny<8&&tmpB[nx][ny]&&tmpB[nx][ny].c!==color) res.push({x:nx,y:ny}); });
             } else ds[p.t].forEach(d => add(x+d[0], y+d[1]));
             return res;
         }
 
         function isGameOver(color) {
-            for (let x=0; x<8; x++) {
-                for (let y=0; y<8; y++) {
-                    if (board[x][y]?.c === color) {
-                        const mvs = getRawMoves(x, y, color, board).filter(m => {
-                            const tmp = board.map(r => [...r]); tmp[m.x][m.y] = tmp[x][y]; tmp[x][y] = null;
-                            return !isCheck(color, tmp);
-                        });
-                        if (mvs.length > 0) return false;
-                    }
-                }
+            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(board[x][y]?.c===color) {
+                if(getRawMoves(x,y,color,board).some(m => {
+                    const tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
+                    return !isCheck(color, tmp);
+                })) return false;
             }
-            if (!isCheck(color)) {
-                const canAfford = Object.values(PIECES).some(p => p.c > 0 && p.c <= score[color]);
-                const zoneAvailable = board.some((col, x) => col.some((sq, y) => !sq && ((color==='w' && y<2) || (color==='b' && y>5))));
-                if (canAfford && zoneAvailable) return false;
+            if(!isCheck(color)) {
+                const zone = board.some((col,x)=>col.some((sq,y)=>!sq && ((color==='w'&&y<2)||(color==='b'&&y>5))));
+                if(Object.values(PIECES).some(p=>p.c>0 && p.c<=score[color]) && zone) return false;
             }
             return true;
         }
 
         function click(x, y) {
             if (turn !== myRole) return;
-            if (placing && (isCheck(turn) || board[x][y])) { placing = null; draw(); return; }
-
             if (placing) {
-                const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
-                if (!board[x][y] && isZone && score[turn] >= PIECES[placing].c) executePlace(x, y, placing, true);
+                const isZone = (turn==='w'&&y<2) || (turn==='b'&&y>5);
+                if (!board[x][y] && isZone && !isCheck(turn) && score[turn] >= PIECES[placing].c) executePlace(x,y,placing,true);
                 else { placing = null; draw(); }
             } else {
                 if (board[x][y]?.c === turn) {
                     selected = {x, y};
-                    moves = getRawMoves(x, y, turn, board).filter(m => {
-                        const tmp = board.map(r => [...r]); tmp[m.x][m.y] = tmp[x][y]; tmp[x][y] = null;
+                    moves = getRawMoves(x,y,turn,board).filter(m => {
+                        const tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
                         return !isCheck(turn, tmp);
                     });
-                } else if (selected && moves.some(m => m.x === x && m.y === y)) {
-                    executeMove(selected.x, selected.y, x, y, true);
-                } else { selected = null; moves = []; }
+                } else if (selected && moves.some(m=>m.x===x && m.y===y)) executeMove(selected.x,selected.y,x,y,true);
+                else { selected = null; moves = []; }
                 draw();
             }
         }
 
-        function executeMove(fx, fy, tx, ty, isLocal) {
-            board[tx][ty] = board[fx][fy];
-            board[fx][fy] = null;
+        function executeMove(fx,fy,tx,ty,local) {
+            board[tx][ty] = board[fx][fy]; board[fx][fy] = null;
             if (board[tx][ty].t === 'p' && (ty === 0 || ty === 7)) board[tx][ty].t = 'q';
-            score[turn] = Math.min(15, score[turn] + 1);
-            if (isLocal && conn) conn.send({ type: 'move', fx, fy, tx, ty });
+            score[turn] = Math.min(15, score[turn]+1);
+            if (local && conn) conn.send({type:'move',fx,fy,tx,ty});
             endTurn();
         }
 
-        function executePlace(x, y, piece, isLocal) {
-            board[x][y] = { t: piece, c: turn };
+        function executePlace(x,y,piece,local) {
+            board[x][y] = { t:piece, c:turn };
             score[turn] -= PIECES[piece].c;
-            if (isLocal && conn) conn.send({ type: 'place', x, y, piece });
+            if (local && conn) conn.send({type:'place',x,y,piece});
             placing = null;
             endTurn();
         }
 
         function endTurn() {
-            selected = null; moves = [];
-            let nextTurn = (turn === "w") ? "b" : "w";
-            if (isGameOver(nextTurn)) {
+            selected = null; moves = []; turn = (turn==="w")?"b":"w";
+            if(isGameOver(turn)) {
                 draw();
-                document.getElementById("win-text").textContent = isCheck(nextTurn) ? (turn === "w" ? "BEYAZ KAZANDI!" : "SİYAH KAZANDI!") : "BERABERE!";
+                document.getElementById("win-text").textContent = isCheck(turn) ? (turn==='w'?"SİYAH MAT YAPTI!":"BEYAZ MAT YAPTI!") : "BERABERE!";
                 document.getElementById("overlay").style.display = "flex";
                 return;
             }
-            turn = nextTurn;
             draw();
-            if (isAI && turn === 'b') runAI();
+            if(isAI && turn==='b') setTimeout(runAI, 600);
+        }
+
+        function runAI() {
+            let all = [];
+            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(board[x][y]?.c==='b'){
+                getRawMoves(x,y,'b',board).forEach(m => {
+                    const tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
+                    if(!isCheck('b',tmp)) all.push({fx:x,fy:y,tx:m.x,ty:m.y, val: (board[m.x][m.y]?PIECES[board[m.x][m.y].t].c:0)});
+                });
+            }
+            if(!isCheck('b')){
+                const afford = Object.entries(PIECES).filter(e=>e[1].c>0 && e[1].c<=score.b);
+                const zone = []; for(let x=0;x<8;x++) for(let y=6;y<8;y++) if(!board[x][y]) zone.push({x,y});
+                if(afford.length>0 && zone.length>0 && Math.random()>0.5){
+                    const p = afford[Math.floor(Math.random()*afford.length)][0];
+                    const z = zone[Math.floor(Math.random()*zone.length)];
+                    executePlace(z.x,z.y,p,false); return;
+                }
+            }
+            if(all.length>0){
+                all.sort((a,b)=>b.val-a.val);
+                const move = all[0]; executeMove(move.fx,move.fy,move.tx,move.ty,false);
+            }
         }
 
         function draw() {
-            const boardEl = document.getElementById("board");
-            boardEl.innerHTML = "";
-            for (let y = 7; y >= 0; y--) {
-                for (let x = 0; x < 8; x++) {
-                    const sq = document.createElement("div");
-                    sq.className = `square ${(x + y) % 2 ? "dark" : "light"}`;
-                    const p = board[x][y];
-                    if (p) {
-                        const sp = document.createElement("div");
-                        sp.className = "piece";
-                        const imgUrl = p.c === 'w' ? PIECES_WHITE[p.t] : PIECES[p.t].img;
-                        sp.style.backgroundImage = `url(${imgUrl})`;
-                        if (p.t === 'k' && isCheck(p.c)) sq.classList.add("is-check");
-                        if (selected && selected.x === x && selected.y === y) sq.classList.add("selected");
-                        sq.appendChild(sp);
-                    }
-                    const isZone = (turn === 'w' && y < 2) || (turn === 'b' && y > 5);
-                    if (moves.some(m => m.x === x && m.y === y) || (placing && !p && isZone)) {
-                        const d = document.createElement("div"); d.className = "dot"; sq.appendChild(d);
-                    }
-                    sq.onclick = () => click(x, y);
-                    boardEl.appendChild(sq);
+            const b = document.getElementById("board"); b.innerHTML = "";
+            for (let y=7;y>=0;y--) for (let x=0;x<8;x++) {
+                const s = document.createElement("div");
+                s.className = `square ${(x+y)%2?"dark":"light"}`;
+                const p = board[x][y];
+                if(p){
+                    const d = document.createElement("div"); d.className = "piece";
+                    d.style.backgroundImage = `url(${p.c==='w'?PIECES[p.t].wimg:PIECES[p.t].img})`;
+                    if(p.t==='k' && isCheck(p.c)) s.classList.add("is-check");
+                    if(selected && selected.x===x && selected.y===y) s.classList.add("selected");
+                    s.appendChild(d);
                 }
+                if(moves.some(m=>m.x===x && m.y===y) || (placing && !p && ((turn==='w'&&y<2)||(turn==='b'&&y>5)))) {
+                    const dot = document.createElement("div"); dot.className = "dot"; s.appendChild(dot);
+                }
+                s.onclick = () => click(x,y);
+                b.appendChild(s);
             }
-            document.getElementById("turn-display").textContent = "SIRA: " + (turn === 'w' ? "BEYAZ" : "SİYAH");
+            document.getElementById("turn-display").textContent = "SIRA: "+(turn==='w'?"BEYAZ":"SİYAH")+(isAI&&turn==='b'?" (BOT)":"");
             document.getElementById("score-display").textContent = `BEYAZ: ${score.w} | SİYAH: ${score.b}`;
             drawPool();
         }
 
         function drawPool() {
-            const pEl = document.getElementById("pool");
-            pEl.innerHTML = "";
-            const currentlyInCheck = isCheck(turn);
+            const pEl = document.getElementById("pool"); pEl.innerHTML = "";
+            const chk = isCheck(turn);
             for (const k in PIECES) {
-                if (k === 'k') continue;
-                const s = document.createElement("div");
-                s.className = "pool-item";
-                const imgUrl = turn === 'w' ? PIECES_WHITE[k] : PIECES[k].img;
-                s.innerHTML = `<img src="${imgUrl}" width="35"> <div style="font-size:10px">${PIECES[k].c}P</div>`;
-                if (PIECES[k].c > score[turn] || turn !== myRole || currentlyInCheck) s.classList.add("disabled");
-                if (placing === k) s.classList.add("active");
-                s.onclick = (e) => { 
-                    e.stopPropagation(); 
-                    if(turn === myRole && !currentlyInCheck) placing = (placing === k ? null : k); 
-                    draw(); 
-                };
-                pEl.appendChild(s);
+                if(k==='k') continue;
+                const i = document.createElement("div"); i.className = "pool-item";
+                if(PIECES[k].c > score[turn] || turn!==myRole || chk) i.classList.add("disabled");
+                if(placing === k) i.classList.add("active");
+                i.innerHTML = `<img src="${turn==='w'?PIECES[k].wimg:PIECES[k].img}"><span>${PIECES[k].c}P</span>`;
+                i.onclick = (e) => { e.stopPropagation(); if(turn===myRole && !chk) placing = (placing===k?null:k); draw(); };
+                pEl.appendChild(i);
             }
         }
-
-        initGame();
         draw();
     </script>
 </body>
