@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chess Fusion: Persistent Nick</title>
+    <title>Chess Fusion: Smart Bot</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { 
@@ -24,7 +24,6 @@
         
         input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 2px solid #334; background: #0f172a; color: white; font-size: 1em; }
         .menu-btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; background: var(--accent); color: white; transition: 0.2s; }
-        .menu-btn:active { transform: scale(0.98); }
 
         #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; padding: 10px; }
         #board-container { width: 100%; aspect-ratio: 1/1; margin-bottom: 15px; }
@@ -39,43 +38,29 @@
         .dot { width: 30%; height: 30%; background: rgba(0,0,0,0.15); border-radius: 50%; position: absolute; z-index: 2; }
 
         #side { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .stat-box { background: var(--panel); padding: 10px; border-radius: 10px; text-align: center; font-size: 0.8em; border: 1px solid #334; }
+        .stat-box { background: var(--panel); padding: 10px; border-radius: 10px; text-align: center; font-size: 0.8em; }
         
         #pool { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; background: var(--panel); padding: 10px; border-radius: 15px; }
-        .pool-item { display: flex; flex-direction: column; align-items: center; padding: 5px; border-radius: 8px; cursor: pointer; }
-        .pool-item img { width: 30px; height: 30px; }
-        .pool-item span { font-size: 10px; margin-top: 4px; }
+        .pool-item { display: flex; flex-direction: column; align-items: center; padding: 5px; border-radius: 8px; }
+        .pool-item img { width: 28px; height: 28px; }
+        .pool-item span { font-size: 9px; margin-top: 2px; }
         .pool-item.active { background: var(--accent); }
-        .pool-item.disabled { opacity: 0.2; pointer-events: none; }
-
-        #nick-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 20px; font-size: 0.7em; color: var(--accent); }
     </style>
 </head>
 <body>
 
     <div id="menu-overlay">
         <div class="menu-card">
-            <h1 style="color:var(--accent); margin:0 0 10px 0;">CHESS FUSION</h1>
-            
-            <div id="nick-section">
-                <p style="font-size: 0.9em; margin-bottom: 5px;">Kendi İsmin:</p>
-                <input type="text" id="my-nick" placeholder="Nickini yaz...">
-            </div>
-
-            <button class="menu-btn" onclick="startAI()">Bota Karşı Oyna</button>
-            
+            <h1 style="color:var(--accent);">CHESS FUSION</h1>
+            <input type="text" id="my-nick" placeholder="İsminiz...">
+            <button class="menu-btn" onclick="startAI()">Bota Karşı (Zor)</button>
             <div style="border-top: 1px solid #334; margin: 15px 0;"></div>
-            
-            <p style="font-size: 0.9em; margin-bottom: 5px;">Arkadaşına Bağlan:</p>
-            <input type="text" id="peer-nick" placeholder="Arkadaşının Nickini yaz...">
-            <button class="menu-btn" style="background:#2980b9" onclick="startMultiplayer()">Bağlan</button>
-            
-            <button onclick="resetNick()" style="background:transparent; border:none; color:#666; font-size:0.7em; margin-top:10px; text-decoration:underline;">İsmimi Değiştir</button>
+            <input type="text" id="peer-nick" placeholder="Arkadaş Nick...">
+            <button class="menu-btn" style="background:#2980b9" onclick="startMultiplayer()">Arkadaşına Bağlan</button>
         </div>
     </div>
 
     <div id="game-ui">
-        <div id="nick-tag"></div>
         <div id="board-container"><div id="board"></div></div>
         <div id="side">
             <div class="stat-box" id="turn-display">SIRA: BEYAZ</div>
@@ -104,105 +89,45 @@
             }
         };
 
-        const PIECES_DATA = { p:1, n:3, b:3, r:5, q:9, k:0 };
-        let isAI = false, peer, conn, myRole = 'w', currentNick = "";
-        let board = [...Array(8)].map(() => Array(8).fill(null));
-        let turn = "w", score = { w: 2, b: 2 };
-        let selected = null, moves = [], placing = null;
+        const PIECES_VAL = { p:1, n:3, b:3, r:5, q:9, k:100 };
+        let isAI = false, peer, conn, myRole = 'w', board = [...Array(8)].map(() => Array(8).fill(null));
+        let turn = "w", score = { w: 2, b: 2 }, selected = null, moves = [], placing = null;
 
-        // --- HAFIZA SİSTEMİ ---
-        window.onload = () => {
-            const savedNick = localStorage.getItem('chessFusionNick');
-            if(savedNick) {
-                currentNick = savedNick;
-                document.getElementById('my-nick').value = savedNick;
-                document.getElementById('my-nick').style.background = "#1e293b";
-            }
-        };
-
-        function resetNick() {
-            localStorage.removeItem('chessFusionNick');
-            document.getElementById('my-nick').value = "";
-            alert("İsim temizlendi. Yeni bir isim yazabilirsin.");
-        }
-
-        function saveNick(nick) {
-            localStorage.setItem('chessFusionNick', nick);
-            currentNick = nick;
-        }
-
-        // --- BAĞLANTI SİSTEMİ ---
-        function initPeer(nick) {
-            peer = new Peer(nick); 
-            peer.on('open', (id) => {
-                document.getElementById('nick-tag').textContent = "Nick: " + id;
-                if(isAI) finalizeUI();
-            });
-            peer.on('error', err => {
-                if(err.type === 'unavailable-id') {
-                    alert("Bu isim şu an başka biri tarafından kullanılıyor!");
-                    location.reload();
-                }
-            });
-            peer.on('connection', c => {
-                conn = c; myRole = 'w'; setupConnection(); finalizeUI();
-            });
-        }
+        // Hafıza
+        window.onload = () => { if(localStorage.getItem('chessNick')) document.getElementById('my-nick').value = localStorage.getItem('chessNick'); };
 
         function startAI() {
-            const nick = document.getElementById('my-nick').value.trim();
-            if(!nick) return alert("Lütfen önce bir isim yaz!");
-            saveNick(nick);
+            const n = document.getElementById('my-nick').value;
+            if(!n) return alert("İsim yaz!");
+            localStorage.setItem('chessNick', n);
             isAI = true; finalizeUI();
         }
 
         function startMultiplayer() {
-            const nick = document.getElementById('my-nick').value.trim();
-            const target = document.getElementById('peer-nick').value.trim();
-            if(!nick || !target) return alert("Kendi ismini ve arkadaşının ismini yazmalısın!");
-            
-            saveNick(nick);
-            initPeer(nick);
-            
-            setTimeout(() => {
-                conn = peer.connect(target);
+            const n = document.getElementById('my-nick').value;
+            const t = document.getElementById('peer-nick').value;
+            if(!n || !t) return alert("İsimleri gir!");
+            localStorage.setItem('chessNick', n);
+            peer = new Peer(n);
+            peer.on('open', () => {
+                conn = peer.connect(t);
                 myRole = 'b';
                 setupConnection();
                 finalizeUI();
-            }, 800);
-        }
-
-        function finalizeUI() {
-            document.getElementById('menu-overlay').style.display = 'none';
-            document.getElementById('game-ui').style.display = 'flex';
-            initGame(); draw();
-        }
-
-        function setupConnection() {
-            conn.on('data', d => {
-                if(d.type==='move') executeMove(d.fx,d.fy,d.tx,d.ty,false);
-                else if(d.type==='place') executePlace(d.x,d.y,d.piece,false);
             });
+            peer.on('connection', c => { conn = c; myRole = 'w'; setupConnection(); finalizeUI(); });
         }
 
-        // --- OYUN MANTIĞI ---
+        function finalizeUI() { document.getElementById('menu-overlay').style.display = 'none'; document.getElementById('game-ui').style.display = 'flex'; initGame(); draw(); }
+        function setupConnection() { conn.on('data', d => { if(d.type==='move') execMove(d.fx,d.fy,d.tx,d.ty,false); else execPlace(d.x,d.y,d.p,false); }); }
         function initGame() { board[0][0]={t:"k",c:"w"}; board[7][7]={t:"k",c:"b"}; }
 
-        function isCheck(color, tmpB = board) {
-            let kPos = null;
-            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(tmpB[x][y]?.t==='k' && tmpB[x][y]?.c===color) kPos = {x,y};
-            if(!kPos) return false;
-            const opp = color==='w'?'b':'w';
-            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(tmpB[x][y]?.c===opp && getRawMoves(x,y,opp,tmpB).some(m=>m.x===kPos.x && m.y===kPos.y)) return true;
-            return false;
-        }
-
-        function getRawMoves(x, y, color, tmpB) {
-            const res = [], p = tmpB[x][y];
+        function getRawMoves(x, y, color, bCheck) {
+            const res = [], p = bCheck[x][y];
             const add = (nx, ny) => {
                 if (nx<0||ny<0||nx>7||ny>7) return "stop";
-                if (!tmpB[nx][ny]) { res.push({x:nx,y:ny}); return "cont"; }
-                if (tmpB[nx][ny].c!==color) { res.push({x:nx,y:ny}); return "stop"; }
+                if (!bCheck[nx][ny]) { res.push({x:nx,y:ny}); return "cont"; }
+                if (bCheck[nx][ny].c!==color) { res.push({x:nx,y:ny}); return "stop"; }
                 return "stop";
             };
             const ds = {
@@ -212,80 +137,104 @@
             if (["r","b","q"].includes(p.t)) ds[p.t].forEach(d => { for(let i=1;i<8;i++) if(add(x+d[0]*i, y+d[1]*i)==="stop") break; });
             else if (p.t === "p") {
                 const dir = color === "w" ? 1 : -1;
-                if (y+dir>=0 && y+dir<8 && !tmpB[x][y+dir]) res.push({x, y:y+dir});
-                [[1,dir],[-1,dir]].forEach(d => { let nx=x+d[0], ny=y+d[1]; if(nx>=0&&nx<8&&ny>=0&&ny<8&&tmpB[nx][ny]&&tmpB[nx][ny].c!==color) res.push({x:nx,y:ny}); });
+                if (y+dir>=0 && y+dir<8 && !bCheck[x][y+dir]) res.push({x, y:y+dir});
+                [[1,dir],[-1,dir]].forEach(d => { let nx=x+d[0], ny=y+d[1]; if(nx>=0&&nx<8&&ny>=0&&ny<8&&bCheck[nx][ny]&&bCheck[nx][ny].c!==color) res.push({x:nx,y:ny}); });
             } else ds[p.t].forEach(d => add(x+d[0], y+d[1]));
             return res;
+        }
+
+        function isCheck(color, bCheck) {
+            let kp = null;
+            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(bCheck[x][y]?.t==='k' && bCheck[x][y]?.c===color) kp={x,y};
+            const opp = color==='w'?'b':'w';
+            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(bCheck[x][y]?.c===opp && getRawMoves(x,y,opp,bCheck).some(m=>m.x===kp.x && m.y===kp.y)) return true;
+            return false;
+        }
+
+        // --- GELİŞMİŞ BOT ZEKSASI ---
+        function smartBot() {
+            let possibleMoves = [];
+            for(let x=0;x<8;x++) {
+                for(let y=0;y<8;y++) {
+                    if(board[x][y]?.c === 'b') {
+                        let mvs = getRawMoves(x,y,'b',board).filter(m => {
+                            let tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
+                            return !isCheck('b', tmp);
+                        });
+                        mvs.forEach(m => {
+                            let scoreMult = 1;
+                            if(board[m.x][m.y]) scoreMult = PIECES_VAL[board[m.x][m.y].t] * 10; // Taş yeme önceliği
+                            possibleMoves.push({fx:x, fy:y, tx:m.x, ty:m.y, weight: scoreMult + Math.random()});
+                        });
+                    }
+                }
+            }
+
+            // Taş Koyma Mantığı
+            const canAfford = Object.entries(PIECES_VAL).filter(e => e[1] > 0 && e[1] <= score.b);
+            if(canAfford.length > 0 && !isCheck('b', board)) {
+                for(let x=0; x<8; x++) {
+                    for(let y=6; y<8; y++) {
+                        if(!board[x][y]) possibleMoves.push({isPlace:true, x, y, p:canAfford[canAfford.length-1][0], weight: 5});
+                    }
+                }
+            }
+
+            possibleMoves.sort((a,b) => b.weight - a.weight);
+            const best = possibleMoves[0];
+            if(best) {
+                if(best.isPlace) execPlace(best.x, best.y, best.p, false);
+                else execMove(best.fx, best.fy, best.tx, best.ty, false);
+            }
         }
 
         function click(x, y) {
             if (turn !== myRole) return;
             if (placing) {
-                const isZ = (turn==='w'&&y<2) || (turn==='b'&&y>5);
-                if (!board[x][y] && isZ && !isCheck(turn) && score[turn] >= PIECES_DATA[placing]) executePlace(x,y,placing,true);
+                if (!board[x][y] && ((turn==='w'&&y<2)||(turn==='b'&&y>5)) && !isCheck(turn, board)) execPlace(x,y,placing,true);
                 else { placing = null; draw(); }
             } else {
                 if (board[x][y]?.c === turn) {
                     selected = {x, y};
                     moves = getRawMoves(x,y,turn,board).filter(m => {
-                        const tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
+                        let tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
                         return !isCheck(turn, tmp);
                     });
-                } else if (selected && moves.some(m=>m.x===x && m.y===y)) executeMove(selected.x,selected.y,x,y,true);
+                } else if (selected && moves.some(m=>m.x===x && m.y===y)) execMove(selected.x,selected.y,x,y,true);
                 else { selected = null; moves = []; }
                 draw();
             }
         }
 
-        function executeMove(fx,fy,tx,ty,local) {
+        function execMove(fx,fy,tx,ty,local) {
             board[tx][ty] = board[fx][fy]; board[fx][fy] = null;
             if (board[tx][ty].t === 'p' && (ty === 0 || ty === 7)) board[tx][ty].t = 'q';
             score[turn] = Math.min(15, score[turn]+1);
             if (local && conn) conn.send({type:'move',fx,fy,tx,ty});
-            endTurn();
+            turn = turn === 'w' ? 'b' : 'w'; draw();
+            if(isAI && turn === 'b') setTimeout(smartBot, 600);
         }
 
-        function executePlace(x,y,piece,local) {
-            board[x][y] = { t:piece, c:turn };
-            score[turn] -= PIECES_DATA[piece];
-            if (local && conn) conn.send({type:'place',x,y,piece});
-            placing = null;
-            endTurn();
-        }
-
-        function endTurn() {
-            selected = null; moves = []; turn = (turn==="w")?"b":"w";
-            draw();
-            if(isAI && turn==='b') setTimeout(runAI, 600);
-        }
-
-        function runAI() {
-            let all = [];
-            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(board[x][y]?.c==='b'){
-                getRawMoves(x,y,'b',board).forEach(m => {
-                    const tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
-                    if(!isCheck('b',tmp)) all.push({fx:x,fy:y,tx:m.x,ty:m.y, val: (board[m.x][m.y]?PIECES_DATA[board[m.x][m.y].t]:0)});
-                });
-            }
-            if(all.length>0){
-                all.sort((a,b)=>b.val-a.val);
-                const move = all[0]; executeMove(move.fx,move.fy,move.tx,move.ty,false);
-            } else turn = 'w';
+        function execPlace(x,y,p,local) {
+            board[x][y] = { t:p, c:turn };
+            score[turn] -= PIECES_VAL[p];
+            if (local && conn) conn.send({type:'place',x,y,p});
+            placing = null; turn = turn === 'w' ? 'b' : 'w'; draw();
+            if(isAI && turn === 'b') setTimeout(smartBot, 600);
         }
 
         function draw() {
             const b = document.getElementById("board"); b.innerHTML = "";
             for (let y=7;y>=0;y--) for (let x=0;x<8;x++) {
                 const s = document.createElement("div"); s.className = `square ${(x+y)%2?"dark":"light"}`;
-                const p = board[x][y];
-                if(p){
+                if(board[x][y]){
                     const d = document.createElement("div"); d.className = "piece";
-                    d.style.backgroundImage = `url(${PIECE_IMAGES[p.c][p.t]})`;
-                    if(p.t==='k' && isCheck(p.c)) s.classList.add("is-check");
-                    if(selected && selected.x===x && selected.y===y) s.classList.add("selected");
+                    d.style.backgroundImage = `url(${PIECE_IMAGES[board[x][y].c][board[x][y].t]})`;
+                    if(board[x][y].t==='k' && isCheck(board[x][y].c, board)) s.classList.add("is-check");
+                    if(selected?.x===x && selected?.y===y) s.classList.add("selected");
                     s.appendChild(d);
                 }
-                if(moves.some(m=>m.x===x && m.y===y) || (placing && !p && ((turn==='w'&&y<2)||(turn==='b'&&y>5)))) {
+                if(moves.some(m=>m.x===x && m.y===y) || (placing && !board[x][y] && ((turn==='w'&&y<2)||(turn==='b'&&y>5)))) {
                     const dot = document.createElement("div"); dot.className = "dot"; s.appendChild(dot);
                 }
                 s.onclick = () => click(x,y); b.appendChild(s);
@@ -297,14 +246,13 @@
 
         function drawPool() {
             const pEl = document.getElementById("pool"); pEl.innerHTML = "";
-            const chk = isCheck(turn);
-            for (const k in PIECES_DATA) {
+            for (const k in PIECES_VAL) {
                 if(k==='k') continue;
                 const i = document.createElement("div"); i.className = "pool-item";
-                if(PIECES_DATA[k] > score[turn] || turn!==myRole || chk) i.classList.add("disabled");
+                if(PIECES_VAL[k] > score[turn] || turn!==myRole || isCheck(turn, board)) i.style.opacity = "0.2";
                 if(placing === k) i.classList.add("active");
-                i.innerHTML = `<img src="${PIECE_IMAGES[turn][k]}"><span>${PIECES_DATA[k]}P</span>`;
-                i.onclick = (e) => { e.stopPropagation(); if(turn===myRole && !chk) placing = (placing===k?null:k); draw(); };
+                i.innerHTML = `<img src="${PIECE_IMAGES[turn][k]}"><span>${PIECES_VAL[k]}P</span>`;
+                i.onclick = () => { if(turn===myRole && !isCheck(turn, board)) placing = k; draw(); };
                 pEl.appendChild(i);
             }
         }
