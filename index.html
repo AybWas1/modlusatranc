@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chess Fusion: Mobile Optimized</title>
+    <title>Chess Fusion: Nick Edition</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { 
@@ -12,9 +12,7 @@
             --bg: #1a1a2e; --panel: #16213e;
             --accent: #4e9f3d;
         }
-        
         * { box-sizing: border-box; touch-action: manipulation; }
-
         body { 
             margin: 0; background: var(--bg); color: white; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -22,7 +20,6 @@
             min-height: 100vh; overflow-x: hidden;
         }
         
-        /* Menü Ekranı */
         #menu-overlay { 
             position: fixed; inset: 0; background: rgba(0,0,0,0.95); 
             z-index: 200; display: flex; flex-direction: column; 
@@ -32,67 +29,37 @@
             background: var(--panel); padding: 30px; border-radius: 20px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 350px; text-align: center;
         }
+        input { 
+            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; 
+            border: 2px solid #334; background: #0f172a; color: white; font-size: 1em;
+        }
         .menu-btn { 
             width: 100%; padding: 15px; margin: 10px 0; border: none; 
             border-radius: 12px; font-size: 1.1em; font-weight: bold; 
             cursor: pointer; transition: 0.2s; background: var(--accent); color: white; 
         }
 
-        /* Oyun Alanı Konteynırı */
-        #game-ui { 
-            display: none; flex-direction: column; align-items: center; 
-            width: 100%; max-width: 500px; padding: 10px; 
-        }
+        #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; padding: 10px; }
+        #board-container { width: 100%; aspect-ratio: 1/1; margin-bottom: 15px; }
+        #board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; border: 4px solid #333; }
 
-        /* Responsive Tahta */
-        #board-container {
-            width: 100%; aspect-ratio: 1/1; 
-            display: flex; justify-content: center; align-items: center;
-            margin-bottom: 15px;
-        }
-        #board { 
-            display: grid; grid-template-columns: repeat(8, 1fr); 
-            grid-template-rows: repeat(8, 1fr); 
-            width: 100%; height: 100%;
-            border: 4px solid #333; border-radius: 4px; overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-        }
-
-        .square { display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+        .square { display: flex; align-items: center; justify-content: center; position: relative; }
         .light { background: var(--light); }
         .dark { background: var(--dark); }
-        
-        .piece { 
-            width: 90%; height: 90%; background-size: contain; 
-            background-repeat: no-repeat; background-position: center; 
-            z-index: 5; pointer-events: none;
-        }
-        
+        .piece { width: 90%; height: 90%; background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 5; pointer-events: none; }
         .selected { background-color: var(--select) !important; }
         .is-check { background-color: var(--check) !important; }
         .dot { width: 30%; height: 30%; background: rgba(0,0,0,0.15); border-radius: 50%; position: absolute; z-index: 2; }
 
-        /* Mobil Alt Panel */
-        #side { 
-            width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;
-        }
-        .stat-box { 
-            background: var(--panel); padding: 10px; border-radius: 10px; 
-            text-align: center; font-size: 0.9em; font-weight: bold; border: 1px solid #334;
-        }
+        #side { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .stat-box { background: var(--panel); padding: 10px; border-radius: 10px; text-align: center; font-size: 0.8em; }
         
-        #pool { 
-            display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; 
-            width: 100%; background: var(--panel); padding: 10px; border-radius: 15px;
-        }
-        .pool-item { 
-            display: flex; flex-direction: column; align-items: center; 
-            padding: 8px 4px; border-radius: 8px; transition: 0.2s;
-        }
-        .pool-item img { width: 32px; height: 32px; }
-        .pool-item span { font-size: 10px; margin-top: 4px; color: #aaa; }
-        .pool-item.active { background: var(--accent) !important; }
-        .pool-item.disabled { opacity: 0.2; grayscale: 1; }
+        #pool { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; background: var(--panel); padding: 10px; border-radius: 15px; }
+        .pool-item { display: flex; flex-direction: column; align-items: center; padding: 5px; border-radius: 8px; }
+        .pool-item img { width: 28px; height: 28px; }
+        .pool-item span { font-size: 9px; margin-top: 2px; }
+        .pool-item.active { background: var(--accent); }
+        .pool-item.disabled { opacity: 0.2; }
 
         #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 300; flex-direction: column; align-items: center; justify-content: center; }
     </style>
@@ -101,36 +68,29 @@
 
     <div id="menu-overlay">
         <div class="menu-card">
-            <h1 style="color:var(--accent); margin:0 0 20px 0;">CHESS FUSION</h1>
-            <button class="menu-btn" onclick="startAI()">Bota Karşı Oyna</button>
-            <button class="menu-btn" style="background:#2980b9" onclick="showMultiplayer()">Arkadaşınla Oyna</button>
+            <h1 style="color:var(--accent); margin-bottom:10px;">CHESS FUSION</h1>
+            <input type="text" id="my-nick" placeholder="Senin Nick'in">
+            <button class="menu-btn" onclick="startAI()">Bota Karşı</button>
+            <div style="border-top: 1px solid #334; margin: 15px 0;"></div>
+            <input type="text" id="peer-nick" placeholder="Arkadaşının Nick'i">
+            <button class="menu-btn" style="background:#2980b9" onclick="startMultiplayer()">Arkadaşına Bağlan</button>
+            <p id="status-msg" style="font-size: 0.8em; color: #888;">Nick girip modu seçin</p>
         </div>
     </div>
 
     <div id="overlay">
-        <h1 id="win-text" style="font-size: 2.5em; margin-bottom: 20px;">MAT!</h1>
-        <button class="menu-btn" style="max-width:200px" onclick="location.reload()">Tekrar Oyna</button>
+        <h1 id="win-text">MAT!</h1>
+        <button class="menu-btn" style="max-width:200px" onclick="location.reload()">Menüye Dön</button>
     </div>
 
     <div id="game-ui">
-        <div id="board-container">
-            <div id="board"></div>
-        </div>
-
+        <div id="board-container"><div id="board"></div></div>
         <div id="side">
             <div class="stat-box" id="turn-display">SIRA: BEYAZ</div>
             <div class="stat-box" id="score-display">B: 2 | S: 2</div>
         </div>
-
         <div id="pool"></div>
-        
-        <div id="network-panel" style="display:none; margin-top:15px; width:100%; background:var(--panel); padding:10px; border-radius:10px; font-size:0.8em;">
-            <div id="my-id-display">ID Alınıyor...</div>
-            <div style="display:flex; gap:5px; margin-top:5px;">
-                <input type="text" id="peer-id-input" placeholder="Arkadaş ID" style="flex:1; padding:8px; border-radius:5px; border:none;">
-                <button onclick="connectToPeer()" style="padding:8px; background:var(--accent); border:none; color:white; border-radius:5px;">Bağlan</button>
-            </div>
-        </div>
+        <div id="nick-display" style="margin-top:10px; font-size:0.7em; color:#4e9f3d"></div>
     </div>
 
     <script>
@@ -143,23 +103,70 @@
             k: { c: 0, img: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg" }
         };
 
-        let isAI = false, peer, conn, myRole = 'w';
+        let isAI = false, peer, conn, myRole = 'w', myNick = "";
         let board = [...Array(8)].map(() => Array(8).fill(null));
         let turn = "w", score = { w: 2, b: 2 };
         let selected = null, moves = [], placing = null;
 
-        function startAI() { isAI = true; finalizeUI(); }
-        function showMultiplayer() { document.getElementById('network-panel').style.display = 'block'; initPeer(); finalizeUI(); }
-        function finalizeUI() { document.getElementById('menu-overlay').style.display = 'none'; document.getElementById('game-ui').style.display = 'flex'; initGame(); draw(); }
+        // Nick'i ID olarak kullanmak için PeerJS'e veriyoruz
+        function initPeer(nick) {
+            // Nick'in benzersiz olması için sonuna küçük bir rastgelelik eklenebilir ama 
+            // kullanıcı deneyimi için doğrudan nick'i ID yapıyoruz.
+            peer = new Peer(nick); 
+            
+            peer.on('open', (id) => {
+                document.getElementById('nick-display').textContent = "Nick'in: " + id;
+                if(isAI) finalizeUI();
+            });
 
-        function initPeer() {
-            peer = new Peer();
-            peer.on('open', id => document.getElementById('my-id-display').innerHTML = `ID: <b>${id}</b>`);
-            peer.on('connection', c => { conn = c; myRole = 'w'; setupConnection(); });
+            peer.on('error', (err) => {
+                if(err.type === 'unavailable-id') {
+                    alert("Bu nick zaten alınmış, lütfen başka bir tane dene.");
+                    location.reload();
+                }
+            });
+
+            peer.on('connection', c => {
+                conn = c; myRole = 'w'; setupConnection();
+                finalizeUI();
+            });
         }
-        function connectToPeer() { const id = document.getElementById('peer-id-input').value; if(id){ conn = peer.connect(id); myRole = 'b'; setupConnection(); } }
-        function setupConnection() { conn.on('open', () => draw()); conn.on('data', d => { if(d.type==='move') executeMove(d.fx,d.fy,d.tx,d.ty,false); else if(d.type==='place') executePlace(d.x,d.y,d.piece,false); }); }
 
+        function startAI() {
+            myNick = document.getElementById('my-nick').value.trim();
+            if(!myNick) { alert("Lütfen bir nick gir!"); return; }
+            isAI = true; finalizeUI();
+        }
+
+        function startMultiplayer() {
+            myNick = document.getElementById('my-nick').value.trim();
+            const targetNick = document.getElementById('peer-nick').value.trim();
+            if(!myNick || !targetNick) { alert("Her iki nick de dolu olmalı!"); return; }
+            
+            initPeer(myNick);
+            
+            setTimeout(() => {
+                conn = peer.connect(targetNick);
+                myRole = 'b';
+                setupConnection();
+                finalizeUI();
+            }, 1000);
+        }
+
+        function finalizeUI() {
+            document.getElementById('menu-overlay').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'flex';
+            initGame(); draw();
+        }
+
+        function setupConnection() {
+            conn.on('data', d => {
+                if(d.type==='move') executeMove(d.fx,d.fy,d.tx,d.ty,false);
+                else if(d.type==='place') executePlace(d.x,d.y,d.piece,false);
+            });
+        }
+
+        // --- OYUN MANTIĞI ---
         function initGame() { board[0][0] = { t: "k", c: "w" }; board[7][7] = { t: "k", c: "b" }; }
 
         function isCheck(color, tmpB = board) {
@@ -279,8 +286,7 @@
         function draw() {
             const b = document.getElementById("board"); b.innerHTML = "";
             for (let y=7;y>=0;y--) for (let x=0;x<8;x++) {
-                const s = document.createElement("div");
-                s.className = `square ${(x+y)%2?"dark":"light"}`;
+                const s = document.createElement("div"); s.className = `square ${(x+y)%2?"dark":"light"}`;
                 const p = board[x][y];
                 if(p){
                     const d = document.createElement("div"); d.className = "piece";
@@ -292,10 +298,9 @@
                 if(moves.some(m=>m.x===x && m.y===y) || (placing && !p && ((turn==='w'&&y<2)||(turn==='b'&&y>5)))) {
                     const dot = document.createElement("div"); dot.className = "dot"; s.appendChild(dot);
                 }
-                s.onclick = () => click(x,y);
-                b.appendChild(s);
+                s.onclick = () => click(x,y); b.appendChild(s);
             }
-            document.getElementById("turn-display").textContent = "SIRA: "+(turn==='w'?"BEYAZ":"SİYAH")+(isAI&&turn==='b'?" (BOT)":"");
+            document.getElementById("turn-display").textContent = "SIRA: "+(turn==='w'?"BEYAZ":"SİYAH");
             document.getElementById("score-display").textContent = `BEYAZ: ${score.w} | SİYAH: ${score.b}`;
             drawPool();
         }
@@ -313,7 +318,6 @@
                 pEl.appendChild(i);
             }
         }
-        draw();
     </script>
 </body>
 </html>
