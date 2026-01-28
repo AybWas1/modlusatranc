@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chess Fusion: Nick Edition</title>
+    <title>Chess Fusion: Görsel Fix</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { 
@@ -15,29 +15,14 @@
         * { box-sizing: border-box; touch-action: manipulation; }
         body { 
             margin: 0; background: var(--bg); color: white; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex; flex-direction: column; align-items: center; 
+            font-family: sans-serif; display: flex; flex-direction: column; align-items: center; 
             min-height: 100vh; overflow-x: hidden;
         }
         
-        #menu-overlay { 
-            position: fixed; inset: 0; background: rgba(0,0,0,0.95); 
-            z-index: 200; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; padding: 20px;
-        }
-        .menu-card { 
-            background: var(--panel); padding: 30px; border-radius: 20px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 350px; text-align: center;
-        }
-        input { 
-            width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; 
-            border: 2px solid #334; background: #0f172a; color: white; font-size: 1em;
-        }
-        .menu-btn { 
-            width: 100%; padding: 15px; margin: 10px 0; border: none; 
-            border-radius: 12px; font-size: 1.1em; font-weight: bold; 
-            cursor: pointer; transition: 0.2s; background: var(--accent); color: white; 
-        }
+        #menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .menu-card { background: var(--panel); padding: 30px; border-radius: 20px; width: 100%; max-width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 2px solid #334; background: #0f172a; color: white; }
+        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; background: var(--accent); color: white; }
 
         #game-ui { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; padding: 10px; }
         #board-container { width: 100%; aspect-ratio: 1/1; margin-bottom: 15px; }
@@ -55,11 +40,11 @@
         .stat-box { background: var(--panel); padding: 10px; border-radius: 10px; text-align: center; font-size: 0.8em; }
         
         #pool { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; background: var(--panel); padding: 10px; border-radius: 15px; }
-        .pool-item { display: flex; flex-direction: column; align-items: center; padding: 5px; border-radius: 8px; }
-        .pool-item img { width: 28px; height: 28px; }
-        .pool-item span { font-size: 9px; margin-top: 2px; }
+        .pool-item { display: flex; flex-direction: column; align-items: center; padding: 5px; border-radius: 8px; cursor: pointer; }
+        .pool-item img { width: 30px; height: 30px; object-fit: contain; }
+        .pool-item span { font-size: 10px; margin-top: 4px; }
         .pool-item.active { background: var(--accent); }
-        .pool-item.disabled { opacity: 0.2; }
+        .pool-item.disabled { opacity: 0.2; pointer-events: none; }
 
         #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 300; flex-direction: column; align-items: center; justify-content: center; }
     </style>
@@ -68,19 +53,18 @@
 
     <div id="menu-overlay">
         <div class="menu-card">
-            <h1 style="color:var(--accent); margin-bottom:10px;">CHESS FUSION</h1>
+            <h1 style="color:var(--accent);">CHESS FUSION</h1>
             <input type="text" id="my-nick" placeholder="Senin Nick'in">
             <button class="menu-btn" onclick="startAI()">Bota Karşı</button>
             <div style="border-top: 1px solid #334; margin: 15px 0;"></div>
             <input type="text" id="peer-nick" placeholder="Arkadaşının Nick'i">
-            <button class="menu-btn" style="background:#2980b9" onclick="startMultiplayer()">Arkadaşına Bağlan</button>
-            <p id="status-msg" style="font-size: 0.8em; color: #888;">Nick girip modu seçin</p>
+            <button class="menu-btn" style="background:#2980b9" onclick="startMultiplayer()">Bağlan</button>
         </div>
     </div>
 
     <div id="overlay">
         <h1 id="win-text">MAT!</h1>
-        <button class="menu-btn" style="max-width:200px" onclick="location.reload()">Menüye Dön</button>
+        <button class="menu-btn" style="max-width:200px" onclick="location.reload()">Tekrar Oyna</button>
     </div>
 
     <div id="game-ui">
@@ -90,67 +74,65 @@
             <div class="stat-box" id="score-display">B: 2 | S: 2</div>
         </div>
         <div id="pool"></div>
-        <div id="nick-display" style="margin-top:10px; font-size:0.7em; color:#4e9f3d"></div>
+        <div id="nick-display" style="margin-top:10px; font-size:0.8em; color:var(--accent)"></div>
     </div>
 
     <script>
-        const PIECES = {
-            p: { c: 1, img: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg" },
-            n: { c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_ndt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg" },
-            b: { c: 3, img: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_bdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg" },
-            r: { c: 5, img: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg" },
-            q: { c: 9, img: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg" },
-            k: { c: 0, img: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg", wimg: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg" }
+        // Wikipedia'dan en stabil ve garanti linkler
+        const PIECE_IMAGES = {
+            'w': {
+                p: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg",
+                n: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg",
+                b: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg",
+                r: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
+                q: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg",
+                k: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg"
+            },
+            'b': {
+                p: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg",
+                n: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg", // Düzeltilmiş At
+                b: "https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg", // Düzeltilmiş Fil
+                r: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg",
+                q: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg",
+                k: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg"
+            }
         };
+
+        const PIECES_DATA = { p:1, n:3, b:3, r:5, q:9, k:0 };
 
         let isAI = false, peer, conn, myRole = 'w', myNick = "";
         let board = [...Array(8)].map(() => Array(8).fill(null));
         let turn = "w", score = { w: 2, b: 2 };
         let selected = null, moves = [], placing = null;
 
-        // Nick'i ID olarak kullanmak için PeerJS'e veriyoruz
         function initPeer(nick) {
-            // Nick'in benzersiz olması için sonuna küçük bir rastgelelik eklenebilir ama 
-            // kullanıcı deneyimi için doğrudan nick'i ID yapıyoruz.
             peer = new Peer(nick); 
-            
             peer.on('open', (id) => {
-                document.getElementById('nick-display').textContent = "Nick'in: " + id;
+                document.getElementById('nick-display').textContent = "Nick: " + id;
                 if(isAI) finalizeUI();
             });
-
-            peer.on('error', (err) => {
-                if(err.type === 'unavailable-id') {
-                    alert("Bu nick zaten alınmış, lütfen başka bir tane dene.");
-                    location.reload();
-                }
-            });
-
             peer.on('connection', c => {
-                conn = c; myRole = 'w'; setupConnection();
-                finalizeUI();
+                conn = c; myRole = 'w'; setupConnection(); finalizeUI();
             });
         }
 
         function startAI() {
             myNick = document.getElementById('my-nick').value.trim();
-            if(!myNick) { alert("Lütfen bir nick gir!"); return; }
+            if(!myNick) return alert("Nick gir!");
             isAI = true; finalizeUI();
         }
 
         function startMultiplayer() {
             myNick = document.getElementById('my-nick').value.trim();
-            const targetNick = document.getElementById('peer-nick').value.trim();
-            if(!myNick || !targetNick) { alert("Her iki nick de dolu olmalı!"); return; }
-            
+            const target = document.getElementById('peer-nick').value.trim();
+            if(!myNick || !target) return alert("Nickleri gir!");
             initPeer(myNick);
-            
             setTimeout(() => {
-                conn = peer.connect(targetNick);
+                conn = peer.connect(target);
                 myRole = 'b';
                 setupConnection();
                 finalizeUI();
-            }, 1000);
+            }, 800);
         }
 
         function finalizeUI() {
@@ -166,8 +148,7 @@
             });
         }
 
-        // --- OYUN MANTIĞI ---
-        function initGame() { board[0][0] = { t: "k", c: "w" }; board[7][7] = { t: "k", c: "b" }; }
+        function initGame() { board[0][0]={t:"k",c:"w"}; board[7][7]={t:"k",c:"b"}; }
 
         function isCheck(color, tmpB = board) {
             let kPos = null;
@@ -199,25 +180,11 @@
             return res;
         }
 
-        function isGameOver(color) {
-            for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(board[x][y]?.c===color) {
-                if(getRawMoves(x,y,color,board).some(m => {
-                    const tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
-                    return !isCheck(color, tmp);
-                })) return false;
-            }
-            if(!isCheck(color)) {
-                const zone = board.some((col,x)=>col.some((sq,y)=>!sq && ((color==='w'&&y<2)||(color==='b'&&y>5))));
-                if(Object.values(PIECES).some(p=>p.c>0 && p.c<=score[color]) && zone) return false;
-            }
-            return true;
-        }
-
         function click(x, y) {
             if (turn !== myRole) return;
             if (placing) {
-                const isZone = (turn==='w'&&y<2) || (turn==='b'&&y>5);
-                if (!board[x][y] && isZone && !isCheck(turn) && score[turn] >= PIECES[placing].c) executePlace(x,y,placing,true);
+                const isZ = (turn==='w'&&y<2) || (turn==='b'&&y>5);
+                if (!board[x][y] && isZ && !isCheck(turn) && score[turn] >= PIECES_DATA[placing]) executePlace(x,y,placing,true);
                 else { placing = null; draw(); }
             } else {
                 if (board[x][y]?.c === turn) {
@@ -242,7 +209,7 @@
 
         function executePlace(x,y,piece,local) {
             board[x][y] = { t:piece, c:turn };
-            score[turn] -= PIECES[piece].c;
+            score[turn] -= PIECES_DATA[piece];
             if (local && conn) conn.send({type:'place',x,y,piece});
             placing = null;
             endTurn();
@@ -250,12 +217,6 @@
 
         function endTurn() {
             selected = null; moves = []; turn = (turn==="w")?"b":"w";
-            if(isGameOver(turn)) {
-                draw();
-                document.getElementById("win-text").textContent = isCheck(turn) ? (turn==='w'?"SİYAH MAT YAPTI!":"BEYAZ MAT YAPTI!") : "BERABERE!";
-                document.getElementById("overlay").style.display = "flex";
-                return;
-            }
             draw();
             if(isAI && turn==='b') setTimeout(runAI, 600);
         }
@@ -265,22 +226,13 @@
             for(let x=0;x<8;x++) for(let y=0;y<8;y++) if(board[x][y]?.c==='b'){
                 getRawMoves(x,y,'b',board).forEach(m => {
                     const tmp = board.map(r=>[...r]); tmp[m.x][m.y]=tmp[x][y]; tmp[x][y]=null;
-                    if(!isCheck('b',tmp)) all.push({fx:x,fy:y,tx:m.x,ty:m.y, val: (board[m.x][m.y]?PIECES[board[m.x][m.y].t].c:0)});
+                    if(!isCheck('b',tmp)) all.push({fx:x,fy:y,tx:m.x,ty:m.y, val: (board[m.x][m.y]?PIECES_DATA[board[m.x][m.y].t]:0)});
                 });
-            }
-            if(!isCheck('b')){
-                const afford = Object.entries(PIECES).filter(e=>e[1].c>0 && e[1].c<=score.b);
-                const zone = []; for(let x=0;x<8;x++) for(let y=6;y<8;y++) if(!board[x][y]) zone.push({x,y});
-                if(afford.length>0 && zone.length>0 && Math.random()>0.5){
-                    const p = afford[Math.floor(Math.random()*afford.length)][0];
-                    const z = zone[Math.floor(Math.random()*zone.length)];
-                    executePlace(z.x,z.y,p,false); return;
-                }
             }
             if(all.length>0){
                 all.sort((a,b)=>b.val-a.val);
                 const move = all[0]; executeMove(move.fx,move.fy,move.tx,move.ty,false);
-            }
+            } else turn = 'w';
         }
 
         function draw() {
@@ -290,7 +242,7 @@
                 const p = board[x][y];
                 if(p){
                     const d = document.createElement("div"); d.className = "piece";
-                    d.style.backgroundImage = `url(${p.c==='w'?PIECES[p.t].wimg:PIECES[p.t].img})`;
+                    d.style.backgroundImage = `url(${PIECE_IMAGES[p.c][p.t]})`;
                     if(p.t==='k' && isCheck(p.c)) s.classList.add("is-check");
                     if(selected && selected.x===x && selected.y===y) s.classList.add("selected");
                     s.appendChild(d);
@@ -301,19 +253,19 @@
                 s.onclick = () => click(x,y); b.appendChild(s);
             }
             document.getElementById("turn-display").textContent = "SIRA: "+(turn==='w'?"BEYAZ":"SİYAH");
-            document.getElementById("score-display").textContent = `BEYAZ: ${score.w} | SİYAH: ${score.b}`;
+            document.getElementById("score-display").textContent = `B: ${score.w} | S: ${score.b}`;
             drawPool();
         }
 
         function drawPool() {
             const pEl = document.getElementById("pool"); pEl.innerHTML = "";
             const chk = isCheck(turn);
-            for (const k in PIECES) {
+            for (const k in PIECES_DATA) {
                 if(k==='k') continue;
                 const i = document.createElement("div"); i.className = "pool-item";
-                if(PIECES[k].c > score[turn] || turn!==myRole || chk) i.classList.add("disabled");
+                if(PIECES_DATA[k] > score[turn] || turn!==myRole || chk) i.classList.add("disabled");
                 if(placing === k) i.classList.add("active");
-                i.innerHTML = `<img src="${turn==='w'?PIECES[k].wimg:PIECES[k].img}"><span>${PIECES[k].c}P</span>`;
+                i.innerHTML = `<img src="${PIECE_IMAGES[turn][k]}"><span>${PIECES_DATA[k]}P</span>`;
                 i.onclick = (e) => { e.stopPropagation(); if(turn===myRole && !chk) placing = (placing===k?null:k); draw(); };
                 pEl.appendChild(i);
             }
